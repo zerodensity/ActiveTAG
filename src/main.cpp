@@ -29,6 +29,7 @@ namespace {
 
 constexpr wchar_t kWindowClass[] = L"ActiveTAGConfiguratorWindow";
 constexpr wchar_t kWindowTitle[] = ACTIVETAG_WINDOW_TITLE_W;
+constexpr wchar_t kAppTitle[] = ACTIVETAG_APP_TITLE_W;
 constexpr UINT_PTR kPortTimer = 1;
 constexpr UINT kPortScanIntervalMs = 1400;
 constexpr UINT WM_ACTIVE_TAG_FOUND = WM_APP + 1;
@@ -473,7 +474,7 @@ void connectSelectedPort() {
     wchar_t port[64]{};
     GetWindowTextW(g.portCombo, port, static_cast<int>(std::size(port)));
     if (port[0] == L'\0') {
-        MessageBoxW(g.window, L"Select a COM port.", kWindowTitle, MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(g.window, L"Select a COM port.", kAppTitle, MB_OK | MB_ICONINFORMATION);
         return;
     }
 
@@ -607,7 +608,7 @@ void saveToTag() {
         renderSnapshot(saved);
         appendLog(
             L"Saved and verified " + std::to_wstring(changes.size()) + L" changed field(s).\r\n");
-        MessageBoxW(g.window, L"Config saved and verified.", kWindowTitle, MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(g.window, L"Config saved and verified.", kAppTitle, MB_OK | MB_ICONINFORMATION);
     } catch (const std::exception& error) {
         setBusy(false);
         showError(error.what());
@@ -680,7 +681,7 @@ void createUi(HWND window) {
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
 
-    HWND title = createControl(L"STATIC", kWindowTitle, SS_LEFT, 22, 14, 365, 29, 0);
+    HWND title = createControl(L"STATIC", kAppTitle, SS_LEFT, 22, 14, 365, 29, 0);
     setFont(title, g.titleFont);
     createControl(
         L"STATIC",
@@ -932,7 +933,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
             nullptr,
             L"ActiveTAG-Configurator.log could not be opened next to the executable. "
             L"Move the application to a writable folder and try again.",
-            kWindowTitle,
+            kAppTitle,
             MB_OK | MB_ICONERROR);
         return 1;
     }

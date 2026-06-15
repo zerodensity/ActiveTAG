@@ -24,7 +24,8 @@ $header = @"
 #define ACTIVETAG_VERSION_PATCH $patch
 #define ACTIVETAG_VERSION_W L"$displayVersion"
 #define ACTIVETAG_VERSION_A "$displayVersion"
-#define ACTIVETAG_WINDOW_TITLE_W L"ActiveTAG Configurator $displayVersion"
+#define ACTIVETAG_APP_TITLE_W L"ActiveTAG Configurator $displayVersion"
+#define ACTIVETAG_WINDOW_TITLE_W L"Zero Density ActiveTAG Configurator $displayVersion"
 #define ACTIVETAG_EXE_NAME_W L"ActiveTAG-Configurator-$displayVersion.exe"
 "@
 Set-Content -LiteralPath (Join-Path $generated "version.hpp") -Value $header -Encoding ascii
