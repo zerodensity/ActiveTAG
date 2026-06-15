@@ -1,0 +1,717 @@
+#include "active_tag.hpp"
+
+#include <windows.h>
+#include <commctrl.h>
+#include <commdlg.h>
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <filesystem>
+#include <fstream>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+using json = nlohmann::json;
+
+namespace {
+
+constexpr wchar_t kWindowClass[] = L"ActiveTAGConfiguratorWindow";
+constexpr wchar_t kWindowTitle[] = L"ActiveTAG Configurator";
+constexpr UINT_PTR kPortTimer = 1;
+constexpr UINT kPortScanIntervalMs = 1400;
+constexpr UINT WM_ACTIVE_TAG_FOUND = WM_APP + 1;
+constexpr UINT WM_ACTIVE_TAG_PROBE_FINISHED = WM_APP + 2;
+
+enum ControlId {
+    IDC_PORTS = 1001,
+    IDC_REFRESH_PORTS,
+    IDC_CONNECT,
+    IDC_DISCONNECT,
+    IDC_READ,
+    IDC_EXPORT,
+    IDC_IMPORT,
+    IDC_SAVE,
+    IDC_GROUP,
+    IDC_LOG,
+    IDC_DEVICE_INFO,
+    IDC_FIRST_FIELD = 2000
+};
+
+struct FieldUi {
+    std::string id;
+    HWND label = nullptr;
+    HWND edit = nullptr;
+    HWND note = nullptr;
+};
+
+struct AppState {
+    HWND window = nullptr;
+    HWND portCombo = nullptr;
+    HWND connectButton = nullptr;
+    HWND disconnectButton = nullptr;
+    HWND readButton = nullptr;
+    HWND exportButton = nullptr;
+    HWND importButton = nullptr;
+    HWND saveButton = nullptr;
+    HWND groupCombo = nullptr;
+    HWND deviceInfo = nullptr;
+    HWND log = nullptr;
+    HFONT normalFont = nullptr;
+    HFONT titleFont = nullptr;
+    activetag::ActiveTag tag;
+    activetag::Snapshot snapshot;
+    std::vector<FieldUi> fields;
+    std::vector<activetag::PortInfo> ports;
+    std::thread probeThread;
+    std::atomic_bool probeRunning = false;
+    bool busy = false;
+};
+
+AppState g;
+
+std::wstring utf8ToWide(const std::string& value) {
+    if (value.empty()) {
+        return {};
+    }
+    const int count = MultiByteToWideChar(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+    std::wstring result(count, L'\0');
+    MultiByteToWideChar(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), result.data(), count);
+    return result;
+}
+
+std::string wideToUtf8(const std::wstring& value) {
+    if (value.empty()) {
+        return {};
+    }
+    const int count = WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    std::string result(count, '\0');
+    WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), result.data(), count, nullptr, nullptr);
+    return result;
+}
+
+void setFont(HWND control, HFONT font = nullptr) {
+    SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font ? font : g.normalFont), TRUE);
+}
+
+HWND createControl(
+    const wchar_t* className,
+    const wchar_t* text,
+    DWORD style,
+    int x,
+    int y,
+    int width,
+    int height,
+    int id,
+    DWORD extendedStyle = 0) {
+    HWND control = CreateWindowExW(
+        extendedStyle,
+        className,
+        text,
+        WS_CHILD | WS_VISIBLE | style,
+        x,
+        y,
+        width,
+        height,
+        g.window,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
+        GetModuleHandleW(nullptr),
+        nullptr);
+    setFont(control);
+    return control;
+}
+
+void appendLog(const std::wstring& text) {
+    const int length = GetWindowTextLengthW(g.log);
+    SendMessageW(g.log, EM_SETSEL, length, length);
+    SendMessageW(g.log, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(text.c_str()));
+    SendMessageW(g.log, EM_SCROLLCARET, 0, 0);
+}
+
+void showError(const std::string& message) {
+    appendLog(L"\r\nERROR: " + utf8ToWide(message) + L"\r\n");
+    MessageBoxW(g.window, utf8ToWide(message).c_str(), L"ActiveTAG Error", MB_OK | MB_ICONERROR);
+}
+
+void setBusy(bool busy) {
+    g.busy = busy;
+    EnableWindow(g.portCombo, !busy && !g.tag.isConnected());
+    EnableWindow(g.connectButton, !busy && !g.tag.isConnected());
+    EnableWindow(g.disconnectButton, !busy && g.tag.isConnected());
+    EnableWindow(g.readButton, !busy && g.tag.isConnected());
+    EnableWindow(g.exportButton, !busy && g.tag.isConnected());
+    EnableWindow(g.saveButton, !busy && g.tag.isConnected());
+    EnableWindow(g.groupCombo, !busy && g.tag.isConnected());
+    for (const FieldUi& field : g.fields) {
+        EnableWindow(field.edit, !busy && g.tag.isConnected());
+    }
+}
+
+std::wstring metadataValue(const activetag::Snapshot& snapshot, const std::string& key) {
+    const auto it = snapshot.metadata.find(key);
+    return it == snapshot.metadata.end() ? L"-" : utf8ToWide(it->second);
+}
+
+void setEditNumber(HWND edit, long long value) {
+    SetWindowTextW(edit, std::to_wstring(value).c_str());
+}
+
+bool getEditNumber(HWND edit, long long& value) {
+    wchar_t buffer[64]{};
+    GetWindowTextW(edit, buffer, static_cast<int>(std::size(buffer)));
+    wchar_t* end = nullptr;
+    value = wcstoll(buffer, &end, 0);
+    return end != buffer && *end == L'\0';
+}
+
+void renderSnapshot(const activetag::Snapshot& snapshot) {
+    g.snapshot = snapshot;
+    const std::wstring group = snapshot.detectedLabelGroup
+        ? std::to_wstring(*snapshot.detectedLabelGroup)
+        : L"Custom";
+    const std::wstring info =
+        L"Serial: " + metadataValue(snapshot, "serialNum") +
+        L"     Firmware: " + utf8ToWide(snapshot.firmwareVersion) +
+        L"     Hardware: " + metadataValue(snapshot, "hardwareRev") +
+        L"     COM: " + g.tag.portPath() +
+        L"     Label Group: " + group;
+    SetWindowTextW(g.deviceInfo, info.c_str());
+
+    for (const FieldUi& fieldUi : g.fields) {
+        const auto it = snapshot.fields.find(fieldUi.id);
+        const bool available =
+            it != snapshot.fields.end() && it->second.supported && it->second.hasNumericValue;
+        ShowWindow(fieldUi.label, available ? SW_SHOW : SW_HIDE);
+        ShowWindow(fieldUi.edit, available ? SW_SHOW : SW_HIDE);
+        ShowWindow(fieldUi.note, available ? SW_SHOW : SW_HIDE);
+        if (available) {
+            setEditNumber(fieldUi.edit, it->second.numericValue);
+            SetWindowTextW(
+                fieldUi.note,
+                it->second.documented
+                    ? utf8ToWide("Field [" + fieldUi.id + "]").c_str()
+                    : L"Advanced: not documented for firmware 2.x");
+        }
+    }
+
+    SendMessageW(
+        g.groupCombo,
+        CB_SETCURSEL,
+        snapshot.detectedLabelGroup ? *snapshot.detectedLabelGroup + 1 : 0,
+        0);
+    appendLog(L"\r\n--- Device config ---\r\n" + utf8ToWide(snapshot.raw) + L"\r\n");
+    setBusy(false);
+}
+
+void startAutoProbe() {
+    if (g.tag.isConnected() || g.busy || g.probeRunning || g.ports.empty()) {
+        return;
+    }
+    if (g.probeThread.joinable()) {
+        g.probeThread.join();
+    }
+
+    std::vector<std::wstring> paths;
+    paths.reserve(g.ports.size());
+    for (const auto& port : g.ports) {
+        paths.push_back(port.path);
+    }
+
+    g.probeRunning = true;
+    const HWND targetWindow = g.window;
+    g.probeThread = std::thread([paths = std::move(paths), targetWindow]() {
+        for (const std::wstring& path : paths) {
+            try {
+                activetag::ActiveTag candidate;
+                candidate.connect(path);
+                candidate.disconnect();
+                auto* result = new std::wstring(path);
+                if (!PostMessageW(
+                        targetWindow,
+                        WM_ACTIVE_TAG_FOUND,
+                        0,
+                        reinterpret_cast<LPARAM>(result))) {
+                    delete result;
+                }
+                return;
+            } catch (...) {
+                // Other COM devices are expected and are ignored.
+            }
+        }
+        PostMessageW(targetWindow, WM_ACTIVE_TAG_PROBE_FINISHED, 0, 0);
+    });
+}
+
+void refreshPorts() {
+    const std::wstring selected = [&]() {
+        wchar_t buffer[64]{};
+        GetWindowTextW(g.portCombo, buffer, static_cast<int>(std::size(buffer)));
+        return std::wstring(buffer);
+    }();
+
+    const auto previousPorts = g.ports;
+    g.ports = activetag::SerialPort::enumerate();
+    SendMessageW(g.portCombo, CB_RESETCONTENT, 0, 0);
+    int selection = -1;
+    for (int index = 0; index < static_cast<int>(g.ports.size()); ++index) {
+        SendMessageW(
+            g.portCombo,
+            CB_ADDSTRING,
+            0,
+            reinterpret_cast<LPARAM>(g.ports[index].path.c_str()));
+        if (g.ports[index].path == selected) {
+            selection = index;
+        }
+    }
+    if (selection < 0 && !g.ports.empty()) {
+        selection = 0;
+    }
+    if (selection >= 0) {
+        SendMessageW(g.portCombo, CB_SETCURSEL, selection, 0);
+    }
+
+    const bool portsChanged =
+        previousPorts.size() != g.ports.size() ||
+        !std::equal(
+            previousPorts.begin(),
+            previousPorts.end(),
+            g.ports.begin(),
+            [](const activetag::PortInfo& left, const activetag::PortInfo& right) {
+                return left.path == right.path;
+            });
+    if (portsChanged && !g.tag.isConnected()) {
+        startAutoProbe();
+    }
+}
+
+void connectSelectedPort() {
+    wchar_t port[64]{};
+    GetWindowTextW(g.portCombo, port, static_cast<int>(std::size(port)));
+    if (port[0] == L'\0') {
+        MessageBoxW(g.window, L"Select a COM port.", kWindowTitle, MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    setBusy(true);
+    try {
+        appendLog(L"\r\nConnecting to " + std::wstring(port) + L"...\r\n");
+        g.tag.connect(port);
+        renderSnapshot(g.tag.read());
+    } catch (const std::exception& error) {
+        g.tag.disconnect();
+        setBusy(false);
+        showError(error.what());
+    }
+}
+
+std::wstring chooseFile(bool save) {
+    wchar_t path[MAX_PATH]{};
+    OPENFILENAMEW dialog{};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = g.window;
+    dialog.lpstrFilter = L"ActiveTAG Config (*.json)\0*.json\0All Files\0*.*\0";
+    dialog.lpstrFile = path;
+    dialog.nMaxFile = MAX_PATH;
+    dialog.lpstrDefExt = L"json";
+    dialog.Flags = save
+        ? OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST
+        : OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    return (save ? GetSaveFileNameW(&dialog) : GetOpenFileNameW(&dialog))
+        ? std::wstring(path)
+        : std::wstring();
+}
+
+json snapshotToJson(const activetag::Snapshot& snapshot) {
+    json fields = json::object();
+    for (const auto& [id, field] : snapshot.fields) {
+        if (field.supported && field.documented && field.hasNumericValue) {
+            fields[id] = field.numericValue;
+        }
+    }
+    return {
+        {"schema", "activetag-config/v1"},
+        {"device", {
+            {"serialNumber", snapshot.metadata.contains("serialNum")
+                ? snapshot.metadata.at("serialNum") : ""},
+            {"hardwareRevision", snapshot.metadata.contains("hardwareRev")
+                ? snapshot.metadata.at("hardwareRev") : ""},
+            {"firmwareVersion", snapshot.firmwareVersion}
+        }},
+        {"configuration", {
+            {"detectedLabelGroup", snapshot.detectedLabelGroup
+                ? json(*snapshot.detectedLabelGroup) : json(nullptr)},
+            {"fields", fields}
+        }},
+        {"source", {
+            {"checksum", snapshot.metadata.contains("checksum")
+                ? snapshot.metadata.at("checksum") : ""},
+            {"rawDump", snapshot.raw}
+        }}
+    };
+}
+
+void exportConfig() {
+    std::wstring path = chooseFile(true);
+    if (path.empty()) {
+        return;
+    }
+    if (std::filesystem::path(path).extension().empty()) {
+        path += L".json";
+    }
+    std::ofstream output(std::filesystem::path(path), std::ios::binary);
+    output << snapshotToJson(g.snapshot).dump(2) << '\n';
+    appendLog(L"Config exported: " + path + L"\r\n");
+}
+
+void importConfig() {
+    const std::wstring path = chooseFile(false);
+    if (path.empty()) {
+        return;
+    }
+    try {
+        std::ifstream input(std::filesystem::path(path), std::ios::binary);
+        const json value = json::parse(input);
+        if (value.value("schema", "") != "activetag-config/v1") {
+            throw std::runtime_error("Unsupported config schema.");
+        }
+        if (!g.tag.isConnected()) {
+            throw std::runtime_error("Connect an Active Tag before importing a config.");
+        }
+        const auto& fields = value.at("configuration").at("fields");
+        for (const FieldUi& field : g.fields) {
+            if (fields.contains(field.id) && fields.at(field.id).is_number_integer()) {
+                setEditNumber(field.edit, fields.at(field.id).get<long long>());
+            }
+        }
+        SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
+        appendLog(L"Config loaded into editor; it has not been written yet: " + path + L"\r\n");
+    } catch (const std::exception& error) {
+        showError(error.what());
+    }
+}
+
+std::map<std::string, long long> collectValues() {
+    std::map<std::string, long long> values;
+    for (const FieldUi& field : g.fields) {
+        if (!IsWindowVisible(field.edit)) {
+            continue;
+        }
+        long long value = 0;
+        if (!getEditNumber(field.edit, value)) {
+            throw std::runtime_error("Invalid numeric value for field [" + field.id + "].");
+        }
+        values[field.id] = value;
+    }
+    return values;
+}
+
+void saveToTag() {
+    if (MessageBoxW(
+            g.window,
+            L"Changes will be verified and written to the Active Tag flash memory. Continue?",
+            L"Confirm write",
+            MB_YESNO | MB_ICONWARNING) != IDYES) {
+        return;
+    }
+
+    setBusy(true);
+    try {
+        const auto [saved, changes] = g.tag.apply(collectValues());
+        renderSnapshot(saved);
+        appendLog(
+            L"Saved and verified " + std::to_wstring(changes.size()) + L" changed field(s).\r\n");
+        MessageBoxW(g.window, L"Config saved and verified.", kWindowTitle, MB_OK | MB_ICONINFORMATION);
+    } catch (const std::exception& error) {
+        setBusy(false);
+        showError(error.what());
+    }
+}
+
+void applyLabelGroup(int selection) {
+    if (selection <= 0 || selection > 6) {
+        return;
+    }
+    const int group = selection - 1;
+    for (int led = 0; led < 8; ++led) {
+        for (const FieldUi& field : g.fields) {
+            if (field.id == "D" + std::to_string(led)) {
+                setEditNumber(field.edit, activetag::ActiveTag::labelGroups()[group][led]);
+            }
+        }
+    }
+    for (const FieldUi& field : g.fields) {
+        if (field.id == "2") {
+            setEditNumber(field.edit, group);
+        }
+    }
+}
+
+void createFieldUi(const std::string& id, const wchar_t* title, int column, int row) {
+    const int x = 28 + column * 282;
+    const int y = 206 + row * 54;
+    FieldUi field;
+    field.id = id;
+    field.label = createControl(L"STATIC", title, SS_LEFT, x, y, 154, 18, 0);
+    field.edit = createControl(
+        L"EDIT",
+        L"",
+        WS_BORDER | ES_NUMBER | ES_AUTOHSCROLL,
+        x + 157,
+        y - 3,
+        94,
+        25,
+        IDC_FIRST_FIELD + static_cast<int>(g.fields.size()),
+        WS_EX_CLIENTEDGE);
+    field.note = createControl(
+        L"STATIC",
+        L"",
+        SS_LEFT,
+        x,
+        y + 20,
+        252,
+        16,
+        0);
+    g.fields.push_back(field);
+}
+
+void createUi(HWND window) {
+    g.window = window;
+    g.normalFont = CreateFontW(
+        -14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+    g.titleFont = CreateFontW(
+        -22, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+
+    HWND title = createControl(L"STATIC", kWindowTitle, SS_LEFT, 24, 16, 405, 32, 0);
+    setFont(title, g.titleFont);
+    createControl(
+        L"STATIC",
+        L"Native Windows USB serial configuration utility",
+        SS_LEFT,
+        26,
+        48,
+        450,
+        20,
+        0);
+
+    createControl(L"STATIC", L"COM Port", SS_LEFT, 26, 84, 72, 20, 0);
+    g.portCombo = createControl(
+        WC_COMBOBOXW,
+        L"",
+        CBS_DROPDOWNLIST | WS_VSCROLL,
+        98,
+        80,
+        135,
+        230,
+        IDC_PORTS);
+    createControl(L"BUTTON", L"Refresh", BS_PUSHBUTTON, 242, 79, 76, 27, IDC_REFRESH_PORTS);
+    g.connectButton = createControl(L"BUTTON", L"Connect", BS_DEFPUSHBUTTON, 326, 79, 81, 27, IDC_CONNECT);
+    g.disconnectButton = createControl(L"BUTTON", L"Disconnect", BS_PUSHBUTTON, 415, 79, 90, 27, IDC_DISCONNECT);
+    g.readButton = createControl(L"BUTTON", L"Read Again", BS_PUSHBUTTON, 513, 79, 90, 27, IDC_READ);
+
+    g.deviceInfo = createControl(
+        L"STATIC",
+        L"No Active Tag connected. New COM ports are probed automatically.",
+        SS_LEFT,
+        26,
+        124,
+        940,
+        22,
+        IDC_DEVICE_INFO);
+
+    createControl(L"STATIC", L"Label Group Profile", SS_LEFT, 26, 168, 130, 20, 0);
+    g.groupCombo = createControl(
+        WC_COMBOBOXW,
+        L"",
+        CBS_DROPDOWNLIST,
+        158,
+        164,
+        145,
+        200,
+        IDC_GROUP);
+    SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
+    for (int group = 0; group < 6; ++group) {
+        const std::wstring name = L"Label Group " + std::to_wstring(group);
+        SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
+    }
+    SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
+
+    createFieldUi("2", L"Uplink ID", 0, 0);
+    createFieldUi("3", L"RF Channel", 1, 0);
+    createFieldUi("4", L"LED Brightness", 0, 1);
+    createFieldUi("5", L"On While Charging", 1, 1);
+    createFieldUi("D0", L"LED 0 Active ID", 0, 2);
+    createFieldUi("D1", L"LED 1 Active ID", 1, 2);
+    createFieldUi("D2", L"LED 2 Active ID", 0, 3);
+    createFieldUi("D3", L"LED 3 Active ID", 1, 3);
+    createFieldUi("D4", L"LED 4 Active ID", 0, 4);
+    createFieldUi("D5", L"LED 5 Active ID", 1, 4);
+    createFieldUi("D6", L"LED 6 Active ID", 0, 5);
+    createFieldUi("D7", L"LED 7 Active ID", 1, 5);
+
+    g.exportButton = createControl(L"BUTTON", L"Export Config", BS_PUSHBUTTON, 26, 612, 108, 31, IDC_EXPORT);
+    g.importButton = createControl(L"BUTTON", L"Import Config", BS_PUSHBUTTON, 142, 612, 108, 31, IDC_IMPORT);
+    g.saveButton = createControl(L"BUTTON", L"Save to Active Tag", BS_DEFPUSHBUTTON, 408, 612, 160, 31, IDC_SAVE);
+
+    createControl(L"STATIC", L"Serial communication log", SS_LEFT, 615, 168, 225, 20, 0);
+    g.log = createControl(
+        L"EDIT",
+        L"Waiting for an Active Tag...\r\n",
+        WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
+        615,
+        193,
+        397,
+        450,
+        IDC_LOG,
+        WS_EX_CLIENTEDGE);
+
+    setBusy(false);
+    refreshPorts();
+    SetTimer(window, kPortTimer, kPortScanIntervalMs, nullptr);
+}
+
+LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+        case WM_CREATE:
+            createUi(window);
+            return 0;
+        case WM_TIMER:
+            if (wParam == kPortTimer && !g.busy) {
+                refreshPorts();
+            }
+            return 0;
+        case WM_ACTIVE_TAG_FOUND: {
+            std::unique_ptr<std::wstring> path(reinterpret_cast<std::wstring*>(lParam));
+            g.probeRunning = false;
+            if (!g.tag.isConnected() && path) {
+                SetWindowTextW(g.portCombo, path->c_str());
+                appendLog(L"Active Tag detected on " + *path + L".\r\n");
+                connectSelectedPort();
+            }
+            return 0;
+        }
+        case WM_ACTIVE_TAG_PROBE_FINISHED:
+            g.probeRunning = false;
+            return 0;
+        case WM_COMMAND: {
+            const int id = LOWORD(wParam);
+            const int notification = HIWORD(wParam);
+            switch (id) {
+                case IDC_REFRESH_PORTS:
+                    refreshPorts();
+                    return 0;
+                case IDC_CONNECT:
+                    connectSelectedPort();
+                    return 0;
+                case IDC_DISCONNECT:
+                    g.tag.disconnect();
+                    SetWindowTextW(
+                        g.deviceInfo,
+                        L"No Active Tag connected. New COM ports are probed automatically.");
+                    setBusy(false);
+                    appendLog(L"Disconnected.\r\n");
+                    return 0;
+                case IDC_READ:
+                    try {
+                        setBusy(true);
+                        renderSnapshot(g.tag.read());
+                    } catch (const std::exception& error) {
+                        setBusy(false);
+                        showError(error.what());
+                    }
+                    return 0;
+                case IDC_EXPORT:
+                    exportConfig();
+                    return 0;
+                case IDC_IMPORT:
+                    importConfig();
+                    return 0;
+                case IDC_SAVE:
+                    saveToTag();
+                    return 0;
+                case IDC_GROUP:
+                    if (notification == CBN_SELCHANGE) {
+                        applyLabelGroup(static_cast<int>(SendMessageW(g.groupCombo, CB_GETCURSEL, 0, 0)));
+                    }
+                    return 0;
+                default:
+                    return 0;
+            }
+        }
+        case WM_DESTROY:
+            KillTimer(window, kPortTimer);
+            g.tag.disconnect();
+            if (g.probeThread.joinable()) {
+                g.probeThread.join();
+            }
+            if (g.normalFont) {
+                DeleteObject(g.normalFont);
+            }
+            if (g.titleFont) {
+                DeleteObject(g.titleFont);
+            }
+            PostQuitMessage(0);
+            return 0;
+        default:
+            return DefWindowProcW(window, message, wParam, lParam);
+    }
+}
+
+}  // namespace
+
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
+    INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_STANDARD_CLASSES};
+    InitCommonControlsEx(&controls);
+
+    WNDCLASSEXW windowClass{};
+    windowClass.cbSize = sizeof(windowClass);
+    windowClass.hInstance = instance;
+    windowClass.lpfnWndProc = windowProc;
+    windowClass.lpszClassName = kWindowClass;
+    windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    windowClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    if (!RegisterClassExW(&windowClass)) {
+        return 1;
+    }
+
+    HWND window = CreateWindowExW(
+        0,
+        kWindowClass,
+        kWindowTitle,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        1055,
+        715,
+        nullptr,
+        nullptr,
+        instance,
+        nullptr);
+    if (!window) {
+        return 1;
+    }
+
+    ShowWindow(window, showCommand);
+    UpdateWindow(window);
+
+    MSG message{};
+    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+    return static_cast<int>(message.wParam);
+}

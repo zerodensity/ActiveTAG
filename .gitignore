@@ -1,0 +1,22 @@
+# Native build output
+/build/
+/dist/
+/*.obj
+/*.exe
+/*.pdb
+/*.ilk
+
+# IDE files
+/.vs/
+/.vscode/
+/.git-sandbox-backup/
+/out/
+/cmake-build-*/
+
+# Local hardware captures
+/Active Batcher Output.txt
+/Active Putty Output.txt
+
+# OS files
+Thumbs.db
+Desktop.ini
