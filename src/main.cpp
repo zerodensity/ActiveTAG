@@ -45,6 +45,7 @@ enum ControlId {
     IDC_IMPORT,
     IDC_SAVE,
     IDC_GROUP,
+    IDC_PRODUCT_TABS,
     IDC_THEME,
     IDC_LOG,
     IDC_DEVICE_INFO,
@@ -64,6 +65,12 @@ enum class ThemeMode {
     Dark
 };
 
+enum class ProductType {
+    Camera,
+    TalentTrack,
+    AprilTags
+};
+
 struct AppState {
     HWND window = nullptr;
     HWND portCombo = nullptr;
@@ -74,6 +81,7 @@ struct AppState {
     HWND importButton = nullptr;
     HWND saveButton = nullptr;
     HWND groupCombo = nullptr;
+    HWND productTabs = nullptr;
     HWND themeCombo = nullptr;
     HWND deviceInfo = nullptr;
     HWND log = nullptr;
@@ -89,6 +97,7 @@ struct AppState {
     std::filesystem::path logPath;
     bool busy = false;
     bool ledFieldsLocked = false;
+    ProductType product = ProductType::Camera;
     ThemeMode theme = ThemeMode::Light;
     HBRUSH backgroundBrush = nullptr;
     HBRUSH panelBrush = nullptr;
@@ -273,7 +282,8 @@ BOOL CALLBACK applyThemeToControl(HWND control, LPARAM) {
 
     if (_wcsicmp(className, L"Button") == 0 ||
         _wcsicmp(className, L"ComboBox") == 0 ||
-        _wcsicmp(className, L"Edit") == 0) {
+        _wcsicmp(className, L"Edit") == 0 ||
+        _wcsicmp(className, WC_TABCONTROLW) == 0) {
         SetWindowTheme(control, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
     }
     InvalidateRect(control, nullptr, TRUE);
@@ -338,8 +348,11 @@ std::wstring metadataValue(const activetag::Snapshot& snapshot, const std::strin
     return it == snapshot.metadata.end() ? L"-" : utf8ToWide(it->second);
 }
 
-void setEditNumber(HWND edit, long long value) {
-    SetWindowTextW(edit, std::to_wstring(value).c_str());
+std::wstring formatHex(long long value) {
+    std::wstringstream output;
+    output << L"0x" << std::uppercase << std::hex
+           << static_cast<unsigned long long>(value);
+    return output.str();
 }
 
 bool getEditNumber(HWND edit, long long& value) {
@@ -350,20 +363,79 @@ bool getEditNumber(HWND edit, long long& value) {
     return end != buffer && *end == L'\0';
 }
 
+void updateLedDecimal(FieldUi& field, long long value) {
+    std::wstring text = L"Decimal: " + std::to_wstring(value);
+    if (value == 0xFFFFFFFFLL) {
+        text += L"  (Disabled)";
+    }
+    SetWindowTextW(field.note, text.c_str());
+}
+
+void setFieldNumber(FieldUi& field, long long value) {
+    SetWindowTextW(
+        field.edit,
+        (field.isLedId ? formatHex(value) : std::to_wstring(value)).c_str());
+    if (field.isLedId) {
+        updateLedDecimal(field, value);
+    }
+}
+
+std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
+    if (snapshot.detectedLabelGroup) {
+        return L"CAM" + std::to_wstring(*snapshot.detectedLabelGroup + 1) +
+            L" / Label Group " + std::to_wstring(*snapshot.detectedLabelGroup);
+    }
+    if (snapshot.detectedTalentTrackGroup) {
+        return L"Talent Track " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
+            L" / Label Group " + std::to_wstring(*snapshot.detectedTalentTrackGroup);
+    }
+    return L"Custom";
+}
+
+void populateProfileCombo() {
+    SendMessageW(g.groupCombo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
+
+    if (g.product == ProductType::Camera) {
+        for (int group = 0; group < 6; ++group) {
+            const std::wstring name =
+                L"CAM" + std::to_wstring(group + 1) +
+                L" - Label Group " + std::to_wstring(group);
+            SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
+        }
+    } else if (g.product == ProductType::TalentTrack) {
+        for (int group = 6; group <= 20; ++group) {
+            const std::wstring name =
+                L"Talent Track " + std::to_wstring(group - 5) +
+                L" - Label Group " + std::to_wstring(group);
+            SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
+        }
+    }
+    SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
+}
+
+void selectProduct(ProductType product) {
+    g.product = product;
+    const int tabIndex = product == ProductType::Camera
+        ? 0
+        : product == ProductType::TalentTrack ? 1 : 2;
+    SendMessageW(g.productTabs, TCM_SETCURSEL, tabIndex, 0);
+    populateProfileCombo();
+    g.ledFieldsLocked = false;
+    updateFieldEnableState();
+}
+
 void renderSnapshot(const activetag::Snapshot& snapshot) {
     g.snapshot = snapshot;
-    const std::wstring group = snapshot.detectedLabelGroup
-        ? std::to_wstring(*snapshot.detectedLabelGroup)
-        : L"Custom";
     const std::wstring info =
         L"Serial: " + metadataValue(snapshot, "serialNum") +
         L"     Firmware: " + utf8ToWide(snapshot.firmwareVersion) +
         L"     Hardware: " + metadataValue(snapshot, "hardwareRev") +
         L"     COM: " + g.tag.portPath() +
-        L"     Label Group: " + group;
+        L"     Profile: " + currentProfileName(snapshot);
     SetWindowTextW(g.deviceInfo, info.c_str());
 
-    for (const FieldUi& fieldUi : g.fields) {
+    for (FieldUi& fieldUi : g.fields) {
         const auto it = snapshot.fields.find(fieldUi.id);
         const bool available =
             it != snapshot.fields.end() && it->second.supported && it->second.hasNumericValue;
@@ -371,21 +443,33 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
         ShowWindow(fieldUi.edit, available ? SW_SHOW : SW_HIDE);
         ShowWindow(fieldUi.note, available ? SW_SHOW : SW_HIDE);
         if (available) {
-            setEditNumber(fieldUi.edit, it->second.numericValue);
-            SetWindowTextW(
-                fieldUi.note,
-                it->second.documented
-                    ? utf8ToWide("Field [" + fieldUi.id + "]").c_str()
-                    : L"Advanced: not documented for firmware 2.x");
+            setFieldNumber(fieldUi, it->second.numericValue);
+            if (!fieldUi.isLedId) {
+                SetWindowTextW(
+                    fieldUi.note,
+                    it->second.documented
+                        ? utf8ToWide("Field [" + fieldUi.id + "]").c_str()
+                        : L"Advanced: not documented for firmware 2.x");
+            }
         }
     }
 
-    SendMessageW(
-        g.groupCombo,
-        CB_SETCURSEL,
-        snapshot.detectedLabelGroup ? *snapshot.detectedLabelGroup + 1 : 0,
-        0);
-    g.ledFieldsLocked = snapshot.detectedLabelGroup.has_value();
+    if (snapshot.detectedLabelGroup) {
+        selectProduct(ProductType::Camera);
+        SendMessageW(g.groupCombo, CB_SETCURSEL, *snapshot.detectedLabelGroup + 1, 0);
+    } else if (snapshot.detectedTalentTrackGroup) {
+        selectProduct(ProductType::TalentTrack);
+        SendMessageW(
+            g.groupCombo,
+            CB_SETCURSEL,
+            *snapshot.detectedTalentTrackGroup - 5,
+            0);
+    } else {
+        populateProfileCombo();
+    }
+    g.ledFieldsLocked =
+        snapshot.detectedLabelGroup.has_value() ||
+        snapshot.detectedTalentTrackGroup.has_value();
     setBusy(false);
 }
 
@@ -526,6 +610,8 @@ json snapshotToJson(const activetag::Snapshot& snapshot) {
         {"configuration", {
             {"detectedLabelGroup", snapshot.detectedLabelGroup
                 ? json(*snapshot.detectedLabelGroup) : json(nullptr)},
+            {"detectedTalentTrackGroup", snapshot.detectedTalentTrackGroup
+                ? json(*snapshot.detectedTalentTrackGroup) : json(nullptr)},
             {"fields", fields}
         }},
         {"source", {
@@ -564,9 +650,9 @@ void importConfig() {
             throw std::runtime_error("Connect an Active Tag before importing a config.");
         }
         const auto& fields = value.at("configuration").at("fields");
-        for (const FieldUi& field : g.fields) {
+        for (FieldUi& field : g.fields) {
             if (fields.contains(field.id) && fields.at(field.id).is_number_integer()) {
-                setEditNumber(field.edit, fields.at(field.id).get<long long>());
+                setFieldNumber(field, fields.at(field.id).get<long long>());
             }
         }
         SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
@@ -621,20 +707,37 @@ void applyLabelGroup(int selection) {
         updateFieldEnableState();
         return;
     }
-    if (selection > 6) {
+    int uplink = 0;
+    const std::array<long long, 8>* ledValues = nullptr;
+    if (g.product == ProductType::Camera && selection <= 6) {
+        uplink = selection - 1;
+        ledValues = &activetag::ActiveTag::labelGroups()[uplink];
+    } else if (g.product == ProductType::TalentTrack && selection <= 15) {
+        uplink = selection + 5;
+        ledValues = &activetag::ActiveTag::talentTrackGroups()[selection - 1];
+    } else {
         return;
     }
-    const int group = selection - 1;
+
     for (int led = 0; led < 8; ++led) {
-        for (const FieldUi& field : g.fields) {
+        for (FieldUi& field : g.fields) {
             if (field.id == "D" + std::to_string(led)) {
-                setEditNumber(field.edit, activetag::ActiveTag::labelGroups()[group][led]);
+                setFieldNumber(field, (*ledValues)[led]);
             }
         }
     }
-    for (const FieldUi& field : g.fields) {
+    for (FieldUi& field : g.fields) {
         if (field.id == "2") {
-            setEditNumber(field.edit, group);
+            setFieldNumber(field, uplink);
+        }
+        if (g.product == ProductType::TalentTrack && field.id == "3") {
+            setFieldNumber(field, 20);
+        }
+        if (g.product == ProductType::TalentTrack && field.id == "4") {
+            setFieldNumber(field, 20);
+        }
+        if (g.product == ProductType::TalentTrack && field.id == "5") {
+            setFieldNumber(field, 1);
         }
     }
     g.ledFieldsLocked = true;
@@ -643,15 +746,17 @@ void applyLabelGroup(int selection) {
 
 void createFieldUi(const std::string& id, const wchar_t* title, int column, int row) {
     const int x = 25 + column * 254;
-    const int y = 185 + row * 49;
+    const int y = 220 + row * 49;
     FieldUi field;
     field.id = id;
     field.isLedId = id.starts_with("D");
     field.label = createControl(L"STATIC", title, SS_LEFT, x, y, 139, 17, 0);
+    const DWORD editStyle = WS_BORDER | ES_AUTOHSCROLL |
+        (field.isLedId ? 0 : ES_NUMBER);
     field.edit = createControl(
         L"EDIT",
         L"",
-        WS_BORDER | ES_NUMBER | ES_AUTOHSCROLL,
+        editStyle,
         x + 141,
         y - 3,
         85,
@@ -732,24 +837,37 @@ void createUi(HWND window) {
         20,
         IDC_DEVICE_INFO);
 
-    createControl(L"STATIC", L"Label Group Profile", SS_LEFT, 23, 151, 117, 18, 0);
+    g.productTabs = createControl(
+        WC_TABCONTROLW,
+        L"",
+        TCS_FIXEDWIDTH | TCS_SINGLELINE,
+        23,
+        141,
+        488,
+        31,
+        IDC_PRODUCT_TABS);
+    SendMessageW(g.productTabs, TCM_SETITEMSIZE, 0, MAKELPARAM(158, 25));
+    TCITEMW tab{};
+    tab.mask = TCIF_TEXT;
+    tab.pszText = const_cast<wchar_t*>(L"CAM");
+    SendMessageW(g.productTabs, TCM_INSERTITEM, 0, reinterpret_cast<LPARAM>(&tab));
+    tab.pszText = const_cast<wchar_t*>(L"Talent Track");
+    SendMessageW(g.productTabs, TCM_INSERTITEM, 1, reinterpret_cast<LPARAM>(&tab));
+    tab.pszText = const_cast<wchar_t*>(L"April Tags");
+    SendMessageW(g.productTabs, TCM_INSERTITEM, 2, reinterpret_cast<LPARAM>(&tab));
+    SendMessageW(g.productTabs, TCM_SETCURSEL, 0, 0);
+
+    createControl(L"STATIC", L"Profile", SS_LEFT, 23, 187, 117, 18, 0);
     g.groupCombo = createControl(
         WC_COMBOBOXW,
         L"",
         CBS_DROPDOWNLIST,
         142,
-        148,
-        210,
-        180,
+        183,
+        270,
+        350,
         IDC_GROUP);
-    SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
-    for (int group = 0; group < 6; ++group) {
-        const std::wstring name =
-            L"CAM" + std::to_wstring(group + 1) +
-            L" - Label Group " + std::to_wstring(group);
-        SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
-    }
-    SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
+    populateProfileCombo();
 
     createFieldUi("2", L"Uplink ID", 0, 0);
     createFieldUi("3", L"RF Channel", 1, 0);
@@ -835,6 +953,20 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             return reinterpret_cast<LRESULT>(
                 g.editBrush ? g.editBrush : GetSysColorBrush(COLOR_WINDOW));
         }
+        case WM_NOTIFY: {
+            const auto* header = reinterpret_cast<NMHDR*>(lParam);
+            if (header && header->idFrom == IDC_PRODUCT_TABS &&
+                header->code == TCN_SELCHANGE) {
+                const int selection = static_cast<int>(
+                    SendMessageW(g.productTabs, TCM_GETCURSEL, 0, 0));
+                selectProduct(
+                    selection == 1
+                        ? ProductType::TalentTrack
+                        : selection == 2 ? ProductType::AprilTags : ProductType::Camera);
+                return 0;
+            }
+            return DefWindowProcW(window, message, wParam, lParam);
+        }
         case WM_ACTIVE_TAG_FOUND: {
             std::unique_ptr<std::wstring> path(reinterpret_cast<std::wstring*>(lParam));
             g.probeRunning = false;
@@ -898,6 +1030,19 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                     }
                     return 0;
                 default:
+                    if (id >= IDC_FIRST_FIELD &&
+                        id < IDC_FIRST_FIELD + static_cast<int>(g.fields.size()) &&
+                        notification == EN_CHANGE) {
+                        FieldUi& field = g.fields[id - IDC_FIRST_FIELD];
+                        if (field.isLedId) {
+                            long long value = 0;
+                            if (getEditNumber(field.edit, value)) {
+                                updateLedDecimal(field, value);
+                            } else {
+                                SetWindowTextW(field.note, L"Decimal: invalid value");
+                            }
+                        }
+                    }
                     return 0;
             }
         }

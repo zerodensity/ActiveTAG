@@ -33,6 +33,10 @@ Visual C++ runtime on the target computer.
 | Config import | Loads supported values into the editor before writing |
 | Manual override | Edits Uplink ID, RF Channel, LED Brightness, charging behavior and Custom LED IDs |
 | Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
+| Product tabs | Separates CAM, Talent Track, and April Tags profile families |
+| Talent Track | Applies Label Group 6-20 profiles with only LED 0 active |
+| Automatic profile selection | Opens the CAM or Talent Track tab after matching the connected device |
+| LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
 | Native themes | Switches between coordinated Light and Dark Win32 themes |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
@@ -53,6 +57,7 @@ The firmware 2.x configuration surface currently exposed by the application:
 
 Fields reported as `[-]` are read-only. `[1] (unsupported)` is never written.
 Signal Intensity is intentionally excluded from the editor and config files.
+An LED ID of `0xFFFFFFFF` (`4294967295`) disables that LED.
 
 ## Log File
 

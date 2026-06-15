@@ -6,6 +6,22 @@
 #include <string>
 #include <vector>
 
+std::string talentTrackDump(int group, const std::array<long long, 8>& leds) {
+    std::ostringstream dump;
+    dump << "FIRMWARE VERSION    : 2.3.4 (compiled May  8 2023 15:29:25)\n"
+         << "[-]  serialNum      : 29567\n"
+         << "[-]  hardwareRev    : G\n"
+         << "[2]  uplinkId       : " << group << "\n"
+         << "[3]  rfChannel      : 20\n"
+         << "[4]  ledBrightness  : 20\n"
+         << "[5]  onWhileCharging: 1\n";
+    for (int led = 0; led < 8; ++led) {
+        dump << "[D" << led << "] led" << led << "Id : "
+             << leds[led] << "\n";
+    }
+    return dump.str();
+}
+
 int main() {
     std::ifstream input("Active Putty Output.txt", std::ios::binary);
     if (!input) {
@@ -41,6 +57,10 @@ int main() {
             std::cerr << "Label Group mismatch for dump " << index << ".\n";
             return 1;
         }
+        if (snapshot.detectedTalentTrackGroup) {
+            std::cerr << "Camera dump " << index << " was misidentified as Talent Track.\n";
+            return 1;
+        }
         if (snapshot.fields.at("1").supported) {
             std::cerr << "Unsupported field [1] was treated as writable.\n";
             return 1;
@@ -48,6 +68,30 @@ int main() {
         if (!snapshot.fields.at("D0").supported || !snapshot.fields.at("D7").supported) {
             std::cerr << "LED fields were not treated as writable.\n";
             return 1;
+        }
+    }
+
+    const auto& talentGroups = activetag::ActiveTag::talentTrackGroups();
+    for (int index = 0; index < static_cast<int>(talentGroups.size()); ++index) {
+        const int group = index + 6;
+        const auto snapshot =
+            activetag::ActiveTag::parseDump(talentTrackDump(group, talentGroups[index]));
+        if (!snapshot.detectedTalentTrackGroup ||
+            *snapshot.detectedTalentTrackGroup != group) {
+            std::cerr << "Talent Track mismatch for Label Group " << group << ".\n";
+            return 1;
+        }
+        if (snapshot.detectedLabelGroup) {
+            std::cerr << "Talent Track group " << group << " was misidentified as CAM.\n";
+            return 1;
+        }
+        for (int led = 1; led < 8; ++led) {
+            if (snapshot.fields.at("D" + std::to_string(led)).numericValue !=
+                0xFFFFFFFFLL) {
+                std::cerr << "Talent Track disabled LED mismatch for group "
+                          << group << ".\n";
+                return 1;
+            }
         }
     }
 

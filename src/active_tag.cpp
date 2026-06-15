@@ -168,6 +168,7 @@ Snapshot ActiveTag::parseDump(const std::string& raw) {
     }
 
     snapshot.detectedLabelGroup = detectLabelGroup(snapshot);
+    snapshot.detectedTalentTrackGroup = detectTalentTrackGroup(snapshot);
     return snapshot;
 }
 
@@ -197,6 +198,35 @@ std::optional<int> ActiveTag::detectLabelGroup(const Snapshot& snapshot) {
     return std::nullopt;
 }
 
+std::optional<int> ActiveTag::detectTalentTrackGroup(const Snapshot& snapshot) {
+    const auto uplinkIt = snapshot.fields.find("2");
+    if (uplinkIt == snapshot.fields.end() || !uplinkIt->second.hasNumericValue) {
+        return std::nullopt;
+    }
+
+    for (int index = 0; index < static_cast<int>(talentTrackGroups().size()); ++index) {
+        const int group = index + 6;
+        if (uplinkIt->second.numericValue != group) {
+            continue;
+        }
+
+        bool matches = true;
+        for (int led = 0; led < 8; ++led) {
+            const auto fieldIt = snapshot.fields.find("D" + std::to_string(led));
+            if (fieldIt == snapshot.fields.end() ||
+                !fieldIt->second.hasNumericValue ||
+                fieldIt->second.numericValue != talentTrackGroups()[index][led]) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) {
+            return group;
+        }
+    }
+    return std::nullopt;
+}
+
 const std::array<std::array<long long, 8>, 6>& ActiveTag::labelGroups() {
     static const std::array<std::array<long long, 8>, 6> groups = {{
         {{1, 2, 4, 8, 16, 32, 64, 128}},
@@ -205,6 +235,28 @@ const std::array<std::array<long long, 8>, 6>& ActiveTag::labelGroups() {
         {{516, 528, 1032, 1056, 2064, 2112, 17, 34}},
         {{68, 136, 257, 272, 514, 544, 1028, 1088}},
         {{2056, 2176, 9, 18, 36, 72, 144, 288}}
+    }};
+    return groups;
+}
+
+const std::array<std::array<long long, 8>, 15>& ActiveTag::talentTrackGroups() {
+    constexpr long long disabled = 0xFFFFFFFFLL;
+    static const std::array<std::array<long long, 8>, 15> groups = {{
+        {{0x201, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x14, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x802, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x109, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x242, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x844, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x92, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x248, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x824, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x8A, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x282, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x822, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x4A, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x281, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
+        {{0x812, disabled, disabled, disabled, disabled, disabled, disabled, disabled}}
     }};
     return groups;
 }
