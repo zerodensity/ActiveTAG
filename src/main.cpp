@@ -1,4 +1,6 @@
 #include "active_tag.hpp"
+#include "generated/resource.h"
+#include "generated/version.hpp"
 
 #include <windows.h>
 #include <commctrl.h>
@@ -24,7 +26,7 @@ using json = nlohmann::json;
 namespace {
 
 constexpr wchar_t kWindowClass[] = L"ActiveTAGConfiguratorWindow";
-constexpr wchar_t kWindowTitle[] = L"ActiveTAG Configurator";
+constexpr wchar_t kWindowTitle[] = ACTIVETAG_WINDOW_TITLE_W;
 constexpr UINT_PTR kPortTimer = 1;
 constexpr UINT kPortScanIntervalMs = 1400;
 constexpr UINT WM_ACTIVE_TAG_FOUND = WM_APP + 1;
@@ -770,7 +772,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     windowClass.lpfnWndProc = windowProc;
     windowClass.lpszClassName = kWindowClass;
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    windowClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    windowClass.hIcon = static_cast<HICON>(LoadImageW(
+        instance,
+        MAKEINTRESOURCEW(IDI_ACTIVETAG),
+        IMAGE_ICON,
+        GetSystemMetrics(SM_CXICON),
+        GetSystemMetrics(SM_CYICON),
+        LR_DEFAULTCOLOR));
+    windowClass.hIconSm = static_cast<HICON>(LoadImageW(
+        instance,
+        MAKEINTRESOURCEW(IDI_ACTIVETAG),
+        IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON),
+        GetSystemMetrics(SM_CYSMICON),
+        LR_DEFAULTCOLOR));
     windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     if (!RegisterClassExW(&windowClass)) {
         return 1;

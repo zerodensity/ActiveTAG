@@ -36,6 +36,7 @@ Visual C++ runtime on the target computer.
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
 | Persistent diagnostics | Appends timestamped serial communication logs next to the EXE |
+| Native identity | Embeds a multi-resolution Windows icon and version metadata |
 
 ## Supported Fields
 
@@ -103,11 +104,15 @@ build.cmd
 Output:
 
 ```text
-build\ActiveTAG-Configurator.exe
+build\ActiveTAG-Configurator-vX.Y.Z.exe
 ```
 
 The build uses the static MSVC runtime (`/MT`), so the target machine does not
 need the Visual C++ Redistributable.
+
+The application icon and Windows version metadata are embedded directly into
+the EXE. `version.json` controls the window title, file metadata, EXE name, and
+portable ZIP naming.
 
 ## Test
 
@@ -127,12 +132,12 @@ against the real firmware `2.3.4` serial output used during development.
 Output:
 
 ```text
-dist\ActiveTAG-Configurator-Portable-x64.zip
+dist\ActiveTAG-Configurator-vX.Y.Z-Portable-x64.zip
 ```
 
 The ZIP contains:
 
-- `ActiveTAG-Configurator.exe`
+- Versioned `ActiveTAG-Configurator-vX.Y.Z.exe`
 - Windows dependency check
 - Official DISM/SFC repair helper
 - Portable usage instructions
@@ -153,6 +158,7 @@ third_party/         Vendored nlohmann/json single-header library
 build.cmd            Release EXE build
 test.cmd             Native test build and execution
 package-portable.ps1 Portable ZIP generation
+version.json          Single source for window, EXE and release version
 ```
 
 ## Disclaimer

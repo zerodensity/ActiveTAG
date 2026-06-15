@@ -14,13 +14,28 @@ if not defined VSROOT (
 call "%VSROOT%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
 if errorlevel 1 exit /b 1
 
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Generate-Icon.ps1"
+if errorlevel 1 exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Prepare-Build.ps1"
+if errorlevel 1 exit /b 1
+
+for /f "usebackq tokens=*" %%i in (`powershell.exe -NoProfile -Command "$v=Get-Content -Raw '%~dp0version.json'|ConvertFrom-Json; 'v{0}.{1}.{2}' -f $v.major,$v.minor,$v.patch"`) do (
+  set "APP_VERSION=%%i"
+)
+
 if not exist build mkdir build
 pushd build
 
+rc.exe /nologo /fo "ActiveTAG-Configurator.res" "..\src\generated\app.rc"
+if errorlevel 1 (
+  popd
+  exit /b 1
+)
+
 cl /nologo /std:c++20 /O2 /W4 /EHsc /permissive- /DUNICODE /D_UNICODE /DNOMINMAX /MT ^
   /I"..\third_party" ^
-  "..\src\main.cpp" "..\src\active_tag.cpp" "..\src\serial_port.cpp" ^
-  /link /SUBSYSTEM:WINDOWS /OUT:"ActiveTAG-Configurator.exe" ^
+  "..\src\main.cpp" "..\src\active_tag.cpp" "..\src\serial_port.cpp" "ActiveTAG-Configurator.res" ^
+  /link /SUBSYSTEM:WINDOWS /OUT:"ActiveTAG-Configurator-%APP_VERSION%.exe" ^
   user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib
 
 set "RESULT=%ERRORLEVEL%"

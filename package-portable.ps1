@@ -3,9 +3,13 @@ param()
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
-$exe = Join-Path $root "build\ActiveTAG-Configurator.exe"
-$packageRoot = Join-Path $root "dist\ActiveTAG-Configurator-Portable"
-$zipPath = Join-Path $root "dist\ActiveTAG-Configurator-Portable-x64.zip"
+$version = Get-Content -Raw -LiteralPath (Join-Path $root "version.json") |
+    ConvertFrom-Json
+$displayVersion = "v$($version.major).$($version.minor).$($version.patch)"
+$exeName = "ActiveTAG-Configurator-$displayVersion.exe"
+$exe = Join-Path $root "build\$exeName"
+$packageRoot = Join-Path $root "dist\ActiveTAG-Configurator-$displayVersion-Portable"
+$zipPath = Join-Path $root "dist\ActiveTAG-Configurator-$displayVersion-Portable-x64.zip"
 
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "Build output not found. Run build.cmd first."
