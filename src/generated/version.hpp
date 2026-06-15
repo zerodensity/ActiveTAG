@@ -1,9 +1,9 @@
 #pragma once
 
 #define ACTIVETAG_VERSION_MAJOR 0
-#define ACTIVETAG_VERSION_MINOR 2
-#define ACTIVETAG_VERSION_PATCH 1
-#define ACTIVETAG_VERSION_W L"v0.2.1"
-#define ACTIVETAG_VERSION_A "v0.2.1"
-#define ACTIVETAG_WINDOW_TITLE_W L"ActiveTAG Configurator v0.2.1"
-#define ACTIVETAG_EXE_NAME_W L"ActiveTAG-Configurator-v0.2.1.exe"
+#define ACTIVETAG_VERSION_MINOR 3
+#define ACTIVETAG_VERSION_PATCH 0
+#define ACTIVETAG_VERSION_W L"v0.3.0"
+#define ACTIVETAG_VERSION_A "v0.3.0"
+#define ACTIVETAG_WINDOW_TITLE_W L"ActiveTAG Configurator v0.3.0"
+#define ACTIVETAG_EXE_NAME_W L"ActiveTAG-Configurator-v0.3.0.exe"

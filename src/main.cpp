@@ -5,6 +5,8 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <commdlg.h>
+#include <dwmapi.h>
+#include <uxtheme.h>
 
 #include <nlohmann/json.hpp>
 
@@ -42,6 +44,7 @@ enum ControlId {
     IDC_IMPORT,
     IDC_SAVE,
     IDC_GROUP,
+    IDC_THEME,
     IDC_LOG,
     IDC_DEVICE_INFO,
     IDC_FIRST_FIELD = 2000
@@ -52,6 +55,12 @@ struct FieldUi {
     HWND label = nullptr;
     HWND edit = nullptr;
     HWND note = nullptr;
+    bool isLedId = false;
+};
+
+enum class ThemeMode {
+    Light,
+    Dark
 };
 
 struct AppState {
@@ -64,6 +73,7 @@ struct AppState {
     HWND importButton = nullptr;
     HWND saveButton = nullptr;
     HWND groupCombo = nullptr;
+    HWND themeCombo = nullptr;
     HWND deviceInfo = nullptr;
     HWND log = nullptr;
     HFONT normalFont = nullptr;
@@ -77,6 +87,16 @@ struct AppState {
     std::ofstream logFile;
     std::filesystem::path logPath;
     bool busy = false;
+    bool ledFieldsLocked = false;
+    ThemeMode theme = ThemeMode::Light;
+    HBRUSH backgroundBrush = nullptr;
+    HBRUSH panelBrush = nullptr;
+    HBRUSH editBrush = nullptr;
+    COLORREF textColor = RGB(28, 32, 36);
+    COLORREF mutedTextColor = RGB(83, 91, 99);
+    COLORREF backgroundColor = RGB(246, 247, 249);
+    COLORREF panelColor = RGB(255, 255, 255);
+    COLORREF editColor = RGB(255, 255, 255);
 };
 
 AppState g;
@@ -208,9 +228,95 @@ void appendLog(const std::wstring& text) {
     }
 }
 
+void deleteBrush(HBRUSH& brush) {
+    if (brush) {
+        DeleteObject(brush);
+        brush = nullptr;
+    }
+}
+
+void rebuildThemeBrushes() {
+    if (g.window) {
+        SetClassLongPtrW(
+            g.window,
+            GCLP_HBRBACKGROUND,
+            reinterpret_cast<LONG_PTR>(GetStockObject(NULL_BRUSH)));
+    }
+    deleteBrush(g.backgroundBrush);
+    deleteBrush(g.panelBrush);
+    deleteBrush(g.editBrush);
+
+    if (g.theme == ThemeMode::Dark) {
+        g.backgroundColor = RGB(27, 30, 34);
+        g.panelColor = RGB(34, 38, 43);
+        g.editColor = RGB(42, 47, 53);
+        g.textColor = RGB(238, 241, 244);
+        g.mutedTextColor = RGB(166, 174, 182);
+    } else {
+        g.backgroundColor = RGB(246, 247, 249);
+        g.panelColor = RGB(255, 255, 255);
+        g.editColor = RGB(255, 255, 255);
+        g.textColor = RGB(28, 32, 36);
+        g.mutedTextColor = RGB(83, 91, 99);
+    }
+
+    g.backgroundBrush = CreateSolidBrush(g.backgroundColor);
+    g.panelBrush = CreateSolidBrush(g.panelColor);
+    g.editBrush = CreateSolidBrush(g.editColor);
+}
+
+BOOL CALLBACK applyThemeToControl(HWND control, LPARAM) {
+    wchar_t className[32]{};
+    GetClassNameW(control, className, static_cast<int>(std::size(className)));
+    const bool dark = g.theme == ThemeMode::Dark;
+
+    if (_wcsicmp(className, L"Button") == 0 ||
+        _wcsicmp(className, L"ComboBox") == 0 ||
+        _wcsicmp(className, L"Edit") == 0) {
+        SetWindowTheme(control, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+    }
+    InvalidateRect(control, nullptr, TRUE);
+    return TRUE;
+}
+
+void applyTheme(bool writeLog = true) {
+    rebuildThemeBrushes();
+    SetClassLongPtrW(
+        g.window,
+        GCLP_HBRBACKGROUND,
+        reinterpret_cast<LONG_PTR>(g.backgroundBrush));
+
+    const BOOL darkTitleBar = g.theme == ThemeMode::Dark;
+    DwmSetWindowAttribute(
+        g.window,
+        20,
+        &darkTitleBar,
+        sizeof(darkTitleBar));
+    EnumChildWindows(g.window, applyThemeToControl, 0);
+    InvalidateRect(g.window, nullptr, TRUE);
+    RedrawWindow(
+        g.window,
+        nullptr,
+        nullptr,
+        RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME);
+
+    if (writeLog) {
+        appendLog(g.theme == ThemeMode::Dark
+            ? L"Dark theme enabled."
+            : L"Light theme enabled.");
+    }
+}
+
 void showError(const std::string& message) {
     appendLog(L"\r\nERROR: " + utf8ToWide(message) + L"\r\n");
     MessageBoxW(g.window, utf8ToWide(message).c_str(), L"ActiveTAG Error", MB_OK | MB_ICONERROR);
+}
+
+void updateFieldEnableState() {
+    const bool connectedAndIdle = !g.busy && g.tag.isConnected();
+    for (const FieldUi& field : g.fields) {
+        EnableWindow(field.edit, connectedAndIdle && !(field.isLedId && g.ledFieldsLocked));
+    }
 }
 
 void setBusy(bool busy) {
@@ -222,9 +328,8 @@ void setBusy(bool busy) {
     EnableWindow(g.exportButton, !busy && g.tag.isConnected());
     EnableWindow(g.saveButton, !busy && g.tag.isConnected());
     EnableWindow(g.groupCombo, !busy && g.tag.isConnected());
-    for (const FieldUi& field : g.fields) {
-        EnableWindow(field.edit, !busy && g.tag.isConnected());
-    }
+    EnableWindow(g.themeCombo, !busy);
+    updateFieldEnableState();
 }
 
 std::wstring metadataValue(const activetag::Snapshot& snapshot, const std::string& key) {
@@ -279,6 +384,7 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
         CB_SETCURSEL,
         snapshot.detectedLabelGroup ? *snapshot.detectedLabelGroup + 1 : 0,
         0);
+    g.ledFieldsLocked = snapshot.detectedLabelGroup.has_value();
     setBusy(false);
 }
 
@@ -463,6 +569,8 @@ void importConfig() {
             }
         }
         SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
+        g.ledFieldsLocked = false;
+        updateFieldEnableState();
         appendLog(L"Config loaded into editor; it has not been written yet: " + path + L"\r\n");
     } catch (const std::exception& error) {
         showError(error.what());
@@ -507,7 +615,12 @@ void saveToTag() {
 }
 
 void applyLabelGroup(int selection) {
-    if (selection <= 0 || selection > 6) {
+    if (selection <= 0) {
+        g.ledFieldsLocked = false;
+        updateFieldEnableState();
+        return;
+    }
+    if (selection > 6) {
         return;
     }
     const int group = selection - 1;
@@ -523,6 +636,8 @@ void applyLabelGroup(int selection) {
             setEditNumber(field.edit, group);
         }
     }
+    g.ledFieldsLocked = true;
+    updateFieldEnableState();
 }
 
 void createFieldUi(const std::string& id, const wchar_t* title, int column, int row) {
@@ -530,6 +645,7 @@ void createFieldUi(const std::string& id, const wchar_t* title, int column, int 
     const int y = 185 + row * 49;
     FieldUi field;
     field.id = id;
+    field.isLedId = id.starts_with("D");
     field.label = createControl(L"STATIC", title, SS_LEFT, x, y, 139, 17, 0);
     field.edit = createControl(
         L"EDIT",
@@ -576,6 +692,20 @@ void createUi(HWND window) {
         18,
         0);
 
+    createControl(L"STATIC", L"Theme", SS_RIGHT, 733, 20, 48, 18, 0);
+    g.themeCombo = createControl(
+        WC_COMBOBOXW,
+        L"",
+        CBS_DROPDOWNLIST,
+        789,
+        16,
+        122,
+        100,
+        IDC_THEME);
+    SendMessageW(g.themeCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Light"));
+    SendMessageW(g.themeCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Dark"));
+    SendMessageW(g.themeCombo, CB_SETCURSEL, 0, 0);
+
     createControl(L"STATIC", L"COM Port", SS_LEFT, 23, 76, 65, 18, 0);
     g.portCombo = createControl(
         WC_COMBOBOXW,
@@ -608,12 +738,14 @@ void createUi(HWND window) {
         CBS_DROPDOWNLIST,
         142,
         148,
-        131,
+        210,
         180,
         IDC_GROUP);
     SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
     for (int group = 0; group < 6; ++group) {
-        const std::wstring name = L"Label Group " + std::to_wstring(group);
+        const std::wstring name =
+            L"CAM" + std::to_wstring(group + 1) +
+            L" - Label Group " + std::to_wstring(group);
         SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
     }
     SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
@@ -653,6 +785,7 @@ void createUi(HWND window) {
     appendLog(L"ActiveTAG Configurator started.");
     appendLog(L"Log file: " + g.logPath.wstring());
     appendLog(L"Waiting for an Active Tag...");
+    applyTheme(false);
     setBusy(false);
     refreshPorts();
     SetTimer(window, kPortTimer, kPortScanIntervalMs, nullptr);
@@ -668,6 +801,39 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 refreshPorts();
             }
             return 0;
+        case WM_ERASEBKGND: {
+            RECT area{};
+            GetClientRect(window, &area);
+            FillRect(
+                reinterpret_cast<HDC>(wParam),
+                &area,
+                g.backgroundBrush ? g.backgroundBrush : GetSysColorBrush(COLOR_WINDOW));
+            return 1;
+        }
+        case WM_CTLCOLORSTATIC: {
+            const HDC dc = reinterpret_cast<HDC>(wParam);
+            const HWND control = reinterpret_cast<HWND>(lParam);
+            wchar_t className[16]{};
+            GetClassNameW(control, className, static_cast<int>(std::size(className)));
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, IsWindowEnabled(control) ? g.textColor : g.mutedTextColor);
+            if (_wcsicmp(className, L"Edit") == 0) {
+                SetBkMode(dc, OPAQUE);
+                SetBkColor(dc, g.editColor);
+                return reinterpret_cast<LRESULT>(
+                    g.editBrush ? g.editBrush : GetSysColorBrush(COLOR_WINDOW));
+            }
+            return reinterpret_cast<LRESULT>(
+                g.backgroundBrush ? g.backgroundBrush : GetSysColorBrush(COLOR_WINDOW));
+        }
+        case WM_CTLCOLOREDIT:
+        case WM_CTLCOLORLISTBOX: {
+            const HDC dc = reinterpret_cast<HDC>(wParam);
+            SetTextColor(dc, g.textColor);
+            SetBkColor(dc, g.editColor);
+            return reinterpret_cast<LRESULT>(
+                g.editBrush ? g.editBrush : GetSysColorBrush(COLOR_WINDOW));
+        }
         case WM_ACTIVE_TAG_FOUND: {
             std::unique_ptr<std::wstring> path(reinterpret_cast<std::wstring*>(lParam));
             g.probeRunning = false;
@@ -720,6 +886,14 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 case IDC_GROUP:
                     if (notification == CBN_SELCHANGE) {
                         applyLabelGroup(static_cast<int>(SendMessageW(g.groupCombo, CB_GETCURSEL, 0, 0)));
+                    }
+                    return 0;
+                case IDC_THEME:
+                    if (notification == CBN_SELCHANGE) {
+                        g.theme = SendMessageW(g.themeCombo, CB_GETCURSEL, 0, 0) == 1
+                            ? ThemeMode::Dark
+                            : ThemeMode::Light;
+                        applyTheme();
                     }
                     return 0;
                 default:
@@ -795,7 +969,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         0,
         kWindowClass,
         kWindowTitle,
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         950,
@@ -817,5 +991,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
     }
+    deleteBrush(g.backgroundBrush);
+    deleteBrush(g.panelBrush);
+    deleteBrush(g.editBrush);
     return static_cast<int>(message.wParam);
 }

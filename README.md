@@ -31,8 +31,9 @@ Visual C++ runtime on the target computer.
 | Device inspection | Reads serial number, firmware, hardware revision, RF settings and LED IDs |
 | Config export | Saves a versioned `activetag-config/v1` JSON file |
 | Config import | Loads supported values into the editor before writing |
-| Manual override | Edits Uplink ID, RF Channel, LED Brightness, charging behavior and LED IDs |
-| Label Groups | Applies the verified Label Group 0-5 LED patterns |
+| Manual override | Edits Uplink ID, RF Channel, LED Brightness, charging behavior and Custom LED IDs |
+| Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
+| Native themes | Switches between coordinated Light and Dark Win32 themes |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
 | Persistent diagnostics | Appends timestamped serial communication logs next to the EXE |
@@ -143,7 +144,8 @@ The ZIP contains:
 - Portable usage instructions
 
 The executable depends only on protected Windows system components:
-`KERNEL32`, `USER32`, `GDI32`, `COMCTL32`, `COMDLG32`, and `ADVAPI32`.
+`KERNEL32`, `USER32`, `GDI32`, `COMCTL32`, `COMDLG32`, `ADVAPI32`,
+`DWMAPI`, and `UXTHEME`.
 These DLLs must not be copied between computers or registered with `regsvr32`.
 
 ## Project Layout
