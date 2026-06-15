@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/banner.svg" alt="ActiveTAG Configurator" width="100%">
+  <img src="docs/banner.png" alt="ActiveTAG Configurator" width="100%">
 </p>
 
 <p align="center">
@@ -130,6 +130,7 @@ src/                 Native UI, serial transport and Active Tag protocol
 test/                Native parser tests
 deploy/              Portable dependency and Windows repair scripts
 docs/                Repository artwork
+tools/               Deterministic repository artwork generation
 third_party/         Vendored nlohmann/json single-header library
 build.cmd            Release EXE build
 test.cmd             Native test build and execution
