@@ -35,6 +35,7 @@ Visual C++ runtime on the target computer.
 | Label Groups | Applies the verified Label Group 0-5 LED patterns |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
+| Persistent diagnostics | Appends timestamped serial communication logs next to the EXE |
 
 ## Supported Fields
 
@@ -50,6 +51,23 @@ The firmware 2.x configuration surface currently exposed by the application:
 
 Fields reported as `[-]` are read-only. `[1] (unsupported)` is never written.
 Signal Intensity is intentionally excluded from the editor and config files.
+
+## Log File
+
+While the application is running, it keeps the following file open next to the
+executable:
+
+```text
+ActiveTAG-Configurator.log
+```
+
+The file is opened in append mode and is never overwritten. Every physical log
+line, including serial device responses, receives a local timestamp with
+millisecond precision. The file is flushed as events are written and closed
+when the application exits.
+
+Run the portable EXE from a folder where the current Windows user has write
+permission.
 
 ## Safety Flow
 

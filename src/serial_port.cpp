@@ -4,6 +4,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 
 namespace activetag {
 namespace {
@@ -104,6 +105,9 @@ std::string SerialPort::command(const std::string& value, DWORD timeoutMs) {
 
     PurgeComm(handle_, PURGE_RXCLEAR);
     const std::string payload = value + "\r";
+    if (logCallback_) {
+        logCallback_("TX > " + value);
+    }
     DWORD written = 0;
     if (!WriteFile(handle_, payload.data(), static_cast<DWORD>(payload.size()), &written, nullptr) ||
         written != payload.size()) {
@@ -123,12 +127,19 @@ std::string SerialPort::command(const std::string& value, DWORD timeoutMs) {
             response.append(buffer, bytesRead);
             const auto lastNonSpace = response.find_last_not_of(" \t\r\n");
             if (lastNonSpace != std::string::npos && response[lastNonSpace] == '>') {
+                if (logCallback_) {
+                    logCallback_("RX < " + response);
+                }
                 return response;
             }
         }
     }
 
     throw std::runtime_error("Serial command timed out: " + value);
+}
+
+void SerialPort::setLogCallback(std::function<void(const std::string&)> callback) {
+    logCallback_ = std::move(callback);
 }
 
 std::vector<PortInfo> SerialPort::enumerate() {

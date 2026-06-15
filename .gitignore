@@ -3,6 +3,7 @@
 /dist/
 /*.obj
 /*.exe
+/*.log
 /*.pdb
 /*.ilk
 

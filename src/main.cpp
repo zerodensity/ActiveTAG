@@ -11,6 +11,7 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -71,6 +72,8 @@ struct AppState {
     std::vector<activetag::PortInfo> ports;
     std::thread probeThread;
     std::atomic_bool probeRunning = false;
+    std::ofstream logFile;
+    std::filesystem::path logPath;
     bool busy = false;
 };
 
@@ -131,11 +134,76 @@ HWND createControl(
     return control;
 }
 
+std::wstring timestamp() {
+    SYSTEMTIME time{};
+    GetLocalTime(&time);
+    wchar_t buffer[32]{};
+    swprintf_s(
+        buffer,
+        L"%04u-%02u-%02u %02u:%02u:%02u.%03u",
+        time.wYear,
+        time.wMonth,
+        time.wDay,
+        time.wHour,
+        time.wMinute,
+        time.wSecond,
+        time.wMilliseconds);
+    return buffer;
+}
+
+std::wstring timestampLines(const std::wstring& text) {
+    std::wstring normalized = text;
+    std::replace(normalized.begin(), normalized.end(), L'\r', L'\n');
+
+    std::wstringstream input(normalized);
+    std::wstring line;
+    std::wstring output;
+    while (std::getline(input, line, L'\n')) {
+        if (line.empty()) {
+            continue;
+        }
+        output += L"[" + timestamp() + L"] " + line + L"\r\n";
+    }
+    return output;
+}
+
+bool openLogFile() {
+    wchar_t executablePath[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(
+        nullptr,
+        executablePath,
+        static_cast<DWORD>(std::size(executablePath)));
+    if (length == 0 || length >= std::size(executablePath)) {
+        return false;
+    }
+
+    g.logPath = std::filesystem::path(executablePath).parent_path() /
+        L"ActiveTAG-Configurator.log";
+    g.logFile.open(g.logPath, std::ios::binary | std::ios::app);
+    return g.logFile.is_open();
+}
+
 void appendLog(const std::wstring& text) {
-    const int length = GetWindowTextLengthW(g.log);
-    SendMessageW(g.log, EM_SETSEL, length, length);
-    SendMessageW(g.log, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(text.c_str()));
-    SendMessageW(g.log, EM_SCROLLCARET, 0, 0);
+    const std::wstring timestamped = timestampLines(text);
+    if (timestamped.empty()) {
+        return;
+    }
+
+    if (IsWindow(g.log)) {
+        const int length = GetWindowTextLengthW(g.log);
+        SendMessageW(g.log, EM_SETSEL, length, length);
+        SendMessageW(
+            g.log,
+            EM_REPLACESEL,
+            FALSE,
+            reinterpret_cast<LPARAM>(timestamped.c_str()));
+        SendMessageW(g.log, EM_SCROLLCARET, 0, 0);
+    }
+
+    if (g.logFile.is_open()) {
+        g.logFile << wideToUtf8(timestamped);
+        g.logFile.flush();
+    }
 }
 
 void showError(const std::string& message) {
@@ -209,7 +277,6 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
         CB_SETCURSEL,
         snapshot.detectedLabelGroup ? *snapshot.detectedLabelGroup + 1 : 0,
         0);
-    appendLog(L"\r\n--- Device config ---\r\n" + utf8ToWide(snapshot.raw) + L"\r\n");
     setBusy(false);
 }
 
@@ -457,19 +524,19 @@ void applyLabelGroup(int selection) {
 }
 
 void createFieldUi(const std::string& id, const wchar_t* title, int column, int row) {
-    const int x = 28 + column * 282;
-    const int y = 206 + row * 54;
+    const int x = 25 + column * 254;
+    const int y = 185 + row * 49;
     FieldUi field;
     field.id = id;
-    field.label = createControl(L"STATIC", title, SS_LEFT, x, y, 154, 18, 0);
+    field.label = createControl(L"STATIC", title, SS_LEFT, x, y, 139, 17, 0);
     field.edit = createControl(
         L"EDIT",
         L"",
         WS_BORDER | ES_NUMBER | ES_AUTOHSCROLL,
-        x + 157,
+        x + 141,
         y - 3,
-        94,
-        25,
+        85,
+        23,
         IDC_FIRST_FIELD + static_cast<int>(g.fields.size()),
         WS_EX_CLIENTEDGE);
     field.note = createControl(
@@ -477,9 +544,9 @@ void createFieldUi(const std::string& id, const wchar_t* title, int column, int 
         L"",
         SS_LEFT,
         x,
-        y + 20,
-        252,
-        16,
+        y + 18,
+        227,
+        15,
         0);
     g.fields.push_back(field);
 }
@@ -487,60 +554,60 @@ void createFieldUi(const std::string& id, const wchar_t* title, int column, int 
 void createUi(HWND window) {
     g.window = window;
     g.normalFont = CreateFontW(
-        -14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        -13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
     g.titleFont = CreateFontW(
-        -22, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        -20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
 
-    HWND title = createControl(L"STATIC", kWindowTitle, SS_LEFT, 24, 16, 405, 32, 0);
+    HWND title = createControl(L"STATIC", kWindowTitle, SS_LEFT, 22, 14, 365, 29, 0);
     setFont(title, g.titleFont);
     createControl(
         L"STATIC",
         L"Native Windows USB serial configuration utility",
         SS_LEFT,
-        26,
-        48,
-        450,
-        20,
+        23,
+        43,
+        405,
+        18,
         0);
 
-    createControl(L"STATIC", L"COM Port", SS_LEFT, 26, 84, 72, 20, 0);
+    createControl(L"STATIC", L"COM Port", SS_LEFT, 23, 76, 65, 18, 0);
     g.portCombo = createControl(
         WC_COMBOBOXW,
         L"",
         CBS_DROPDOWNLIST | WS_VSCROLL,
-        98,
-        80,
-        135,
-        230,
+        88,
+        72,
+        122,
+        207,
         IDC_PORTS);
-    createControl(L"BUTTON", L"Refresh", BS_PUSHBUTTON, 242, 79, 76, 27, IDC_REFRESH_PORTS);
-    g.connectButton = createControl(L"BUTTON", L"Connect", BS_DEFPUSHBUTTON, 326, 79, 81, 27, IDC_CONNECT);
-    g.disconnectButton = createControl(L"BUTTON", L"Disconnect", BS_PUSHBUTTON, 415, 79, 90, 27, IDC_DISCONNECT);
-    g.readButton = createControl(L"BUTTON", L"Read Again", BS_PUSHBUTTON, 513, 79, 90, 27, IDC_READ);
+    createControl(L"BUTTON", L"Refresh", BS_PUSHBUTTON, 218, 71, 68, 25, IDC_REFRESH_PORTS);
+    g.connectButton = createControl(L"BUTTON", L"Connect", BS_DEFPUSHBUTTON, 293, 71, 73, 25, IDC_CONNECT);
+    g.disconnectButton = createControl(L"BUTTON", L"Disconnect", BS_PUSHBUTTON, 374, 71, 81, 25, IDC_DISCONNECT);
+    g.readButton = createControl(L"BUTTON", L"Read Again", BS_PUSHBUTTON, 462, 71, 81, 25, IDC_READ);
 
     g.deviceInfo = createControl(
         L"STATIC",
         L"No Active Tag connected. New COM ports are probed automatically.",
         SS_LEFT,
-        26,
-        124,
-        940,
-        22,
+        23,
+        112,
+        846,
+        20,
         IDC_DEVICE_INFO);
 
-    createControl(L"STATIC", L"Label Group Profile", SS_LEFT, 26, 168, 130, 20, 0);
+    createControl(L"STATIC", L"Label Group Profile", SS_LEFT, 23, 151, 117, 18, 0);
     g.groupCombo = createControl(
         WC_COMBOBOXW,
         L"",
         CBS_DROPDOWNLIST,
-        158,
-        164,
-        145,
-        200,
+        142,
+        148,
+        131,
+        180,
         IDC_GROUP);
     SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
     for (int group = 0; group < 6; ++group) {
@@ -562,22 +629,28 @@ void createUi(HWND window) {
     createFieldUi("D6", L"LED 6 Active ID", 0, 5);
     createFieldUi("D7", L"LED 7 Active ID", 1, 5);
 
-    g.exportButton = createControl(L"BUTTON", L"Export Config", BS_PUSHBUTTON, 26, 612, 108, 31, IDC_EXPORT);
-    g.importButton = createControl(L"BUTTON", L"Import Config", BS_PUSHBUTTON, 142, 612, 108, 31, IDC_IMPORT);
-    g.saveButton = createControl(L"BUTTON", L"Save to Active Tag", BS_DEFPUSHBUTTON, 408, 612, 160, 31, IDC_SAVE);
+    g.exportButton = createControl(L"BUTTON", L"Export Config", BS_PUSHBUTTON, 23, 551, 97, 28, IDC_EXPORT);
+    g.importButton = createControl(L"BUTTON", L"Import Config", BS_PUSHBUTTON, 128, 551, 97, 28, IDC_IMPORT);
+    g.saveButton = createControl(L"BUTTON", L"Save to Active Tag", BS_DEFPUSHBUTTON, 367, 551, 144, 28, IDC_SAVE);
 
-    createControl(L"STATIC", L"Serial communication log", SS_LEFT, 615, 168, 225, 20, 0);
+    createControl(L"STATIC", L"Serial communication log", SS_LEFT, 554, 151, 203, 18, 0);
     g.log = createControl(
         L"EDIT",
-        L"Waiting for an Active Tag...\r\n",
+        L"",
         WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
-        615,
-        193,
-        397,
-        450,
+        554,
+        174,
+        357,
+        405,
         IDC_LOG,
         WS_EX_CLIENTEDGE);
 
+    g.tag.setLogCallback([](const std::string& message) {
+        appendLog(utf8ToWide(message));
+    });
+    appendLog(L"ActiveTAG Configurator started.");
+    appendLog(L"Log file: " + g.logPath.wstring());
+    appendLog(L"Waiting for an Active Tag...");
     setBusy(false);
     refreshPorts();
     SetTimer(window, kPortTimer, kPortScanIntervalMs, nullptr);
@@ -663,6 +736,11 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             if (g.titleFont) {
                 DeleteObject(g.titleFont);
             }
+            appendLog(L"ActiveTAG Configurator stopped.");
+            if (g.logFile.is_open()) {
+                g.logFile.flush();
+                g.logFile.close();
+            }
             PostQuitMessage(0);
             return 0;
         default:
@@ -673,6 +751,16 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
+    if (!openLogFile()) {
+        MessageBoxW(
+            nullptr,
+            L"ActiveTAG-Configurator.log could not be opened next to the executable. "
+            L"Move the application to a writable folder and try again.",
+            kWindowTitle,
+            MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_STANDARD_CLASSES};
     InitCommonControlsEx(&controls);
 
@@ -695,13 +783,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        1055,
-        715,
+        950,
+        644,
         nullptr,
         nullptr,
         instance,
         nullptr);
     if (!window) {
+        g.logFile.close();
         return 1;
     }
 

@@ -3,6 +3,7 @@
 #include "serial_port.hpp"
 
 #include <array>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -43,6 +44,7 @@ public:
     Snapshot read();
     std::pair<Snapshot, std::vector<Change>> apply(
         const std::map<std::string, long long>& requested);
+    void setLogCallback(std::function<void(const std::string&)> callback);
 
     static Snapshot parseDump(const std::string& raw);
     static bool isActiveTag(const Snapshot& snapshot);

@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -26,12 +27,14 @@ public:
     [[nodiscard]] const std::wstring& path() const;
 
     std::string command(const std::string& command, DWORD timeoutMs = 4000);
+    void setLogCallback(std::function<void(const std::string&)> callback);
 
     static std::vector<PortInfo> enumerate();
 
 private:
     HANDLE handle_ = INVALID_HANDLE_VALUE;
     std::wstring path_;
+    std::function<void(const std::string&)> logCallback_;
 };
 
 }  // namespace activetag

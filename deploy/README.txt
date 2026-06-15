@@ -4,6 +4,8 @@ ActiveTAG Configurator - Portable Windows Package
 1. Run Run-Dependency-Check.cmd once.
 2. If every dependency is marked OK, run ActiveTAG-Configurator.exe.
 3. No installation, DLL copying, or DLL registration is required.
+4. Keep the EXE in a writable folder. ActiveTAG-Configurator.log is created
+   next to the EXE and appended for every application session.
 
 Required DLLs:
   KERNEL32.dll

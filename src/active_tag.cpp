@@ -6,6 +6,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace activetag {
 namespace {
@@ -58,6 +59,10 @@ const std::wstring& ActiveTag::portPath() const {
 
 Snapshot ActiveTag::read() {
     return parseDump(serial_.command("d", 5000));
+}
+
+void ActiveTag::setLogCallback(std::function<void(const std::string&)> callback) {
+    serial_.setLogCallback(std::move(callback));
 }
 
 std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
