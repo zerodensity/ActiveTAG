@@ -392,7 +392,7 @@ std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
     return L"Custom";
 }
 
-void populateProfileCombo() {
+void populateProfileCombo(int selectedProfile = 0) {
     SendMessageW(g.groupCombo, CB_RESETCONTENT, 0, 0);
     SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
 
@@ -411,17 +411,23 @@ void populateProfileCombo() {
             SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
         }
     }
-    SendMessageW(g.groupCombo, CB_SETCURSEL, 0, 0);
+    const LRESULT itemCount = SendMessageW(g.groupCombo, CB_GETCOUNT, 0, 0);
+    const int safeSelection =
+        selectedProfile >= 0 && selectedProfile < itemCount ? selectedProfile : 0;
+    SendMessageW(g.groupCombo, CB_SETCURSEL, safeSelection, 0);
 }
 
-void selectProduct(ProductType product) {
+void selectProduct(
+    ProductType product,
+    int selectedProfile = 0,
+    bool lockLedFields = false) {
     g.product = product;
     const int tabIndex = product == ProductType::Camera
         ? 0
         : product == ProductType::TalentTrack ? 1 : 2;
     SendMessageW(g.productTabs, TCM_SETCURSEL, tabIndex, 0);
-    populateProfileCombo();
-    g.ledFieldsLocked = false;
+    populateProfileCombo(selectedProfile);
+    g.ledFieldsLocked = lockLedFields;
     updateFieldEnableState();
 }
 
@@ -455,21 +461,20 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
     }
 
     if (snapshot.detectedLabelGroup) {
-        selectProduct(ProductType::Camera);
-        SendMessageW(g.groupCombo, CB_SETCURSEL, *snapshot.detectedLabelGroup + 1, 0);
+        selectProduct(
+            ProductType::Camera,
+            *snapshot.detectedLabelGroup + 1,
+            true);
     } else if (snapshot.detectedTalentTrackGroup) {
-        selectProduct(ProductType::TalentTrack);
-        SendMessageW(
-            g.groupCombo,
-            CB_SETCURSEL,
+        selectProduct(
+            ProductType::TalentTrack,
             *snapshot.detectedTalentTrackGroup - 5,
-            0);
+            true);
     } else {
-        populateProfileCombo();
+        populateProfileCombo(0);
+        g.ledFieldsLocked = false;
+        updateFieldEnableState();
     }
-    g.ledFieldsLocked =
-        snapshot.detectedLabelGroup.has_value() ||
-        snapshot.detectedTalentTrackGroup.has_value();
     setBusy(false);
 }
 
