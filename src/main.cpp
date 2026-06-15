@@ -749,9 +749,8 @@ void applyLabelGroup(int selection) {
     updateFieldEnableState();
 }
 
-void createFieldUi(const std::string& id, const wchar_t* title, int column, int row) {
-    const int x = 25 + column * 254;
-    const int y = 220 + row * 49;
+void createFieldUi(const std::string& id, const wchar_t* title, int x, int row) {
+    const int y = 244 + row * 48;
     FieldUi field;
     field.id = id;
     field.isLedId = id.starts_with("D");
@@ -874,22 +873,26 @@ void createUi(HWND window) {
         IDC_GROUP);
     populateProfileCombo();
 
-    createFieldUi("2", L"Uplink ID", 0, 0);
-    createFieldUi("3", L"RF Channel", 1, 0);
-    createFieldUi("4", L"LED Brightness", 0, 1);
-    createFieldUi("5", L"On While Charging", 1, 1);
-    createFieldUi("D0", L"LED 0 Active ID", 0, 2);
-    createFieldUi("D1", L"LED 1 Active ID", 1, 2);
-    createFieldUi("D2", L"LED 2 Active ID", 0, 3);
-    createFieldUi("D3", L"LED 3 Active ID", 1, 3);
-    createFieldUi("D4", L"LED 4 Active ID", 0, 4);
-    createFieldUi("D5", L"LED 5 Active ID", 1, 4);
-    createFieldUi("D6", L"LED 6 Active ID", 0, 5);
-    createFieldUi("D7", L"LED 7 Active ID", 1, 5);
+    createControl(L"STATIC", L"LED Active IDs", SS_LEFT, 25, 218, 227, 18, 0);
+    createControl(L"STATIC", L"General Settings", SS_LEFT, 285, 218, 227, 18, 0);
 
-    g.exportButton = createControl(L"BUTTON", L"Export Config", BS_PUSHBUTTON, 23, 551, 97, 28, IDC_EXPORT);
-    g.importButton = createControl(L"BUTTON", L"Import Config", BS_PUSHBUTTON, 128, 551, 97, 28, IDC_IMPORT);
-    g.saveButton = createControl(L"BUTTON", L"Save to Active Tag", BS_DEFPUSHBUTTON, 367, 551, 144, 28, IDC_SAVE);
+    createFieldUi("D0", L"LED 0 Active ID", 25, 0);
+    createFieldUi("D1", L"LED 1 Active ID", 25, 1);
+    createFieldUi("D2", L"LED 2 Active ID", 25, 2);
+    createFieldUi("D3", L"LED 3 Active ID", 25, 3);
+    createFieldUi("D4", L"LED 4 Active ID", 25, 4);
+    createFieldUi("D5", L"LED 5 Active ID", 25, 5);
+    createFieldUi("D6", L"LED 6 Active ID", 25, 6);
+    createFieldUi("D7", L"LED 7 Active ID", 25, 7);
+
+    createFieldUi("2", L"Uplink ID", 285, 0);
+    createFieldUi("3", L"RF Channel", 285, 1);
+    createFieldUi("4", L"LED Brightness", 285, 2);
+    createFieldUi("5", L"On While Charging", 285, 3);
+
+    g.exportButton = createControl(L"BUTTON", L"Export Config", BS_PUSHBUTTON, 23, 635, 97, 28, IDC_EXPORT);
+    g.importButton = createControl(L"BUTTON", L"Import Config", BS_PUSHBUTTON, 128, 635, 97, 28, IDC_IMPORT);
+    g.saveButton = createControl(L"BUTTON", L"Save to Active Tag", BS_DEFPUSHBUTTON, 367, 635, 144, 28, IDC_SAVE);
 
     createControl(L"STATIC", L"Serial communication log", SS_LEFT, 554, 151, 203, 18, 0);
     g.log = createControl(
@@ -899,7 +902,7 @@ void createUi(HWND window) {
         554,
         174,
         357,
-        405,
+        489,
         IDC_LOG,
         WS_EX_CLIENTEDGE);
 
@@ -1124,7 +1127,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         950,
-        644,
+        728,
         nullptr,
         nullptr,
         instance,
