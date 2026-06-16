@@ -39,6 +39,7 @@ computer.
 | Automatic profile selection | Opens the CAM or Talent Track tab after matching the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
 | Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
+| Native modal flow | Confirmation, success, and runtime error dialogs use the same ImGui interface |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
 | Persistent diagnostics | Appends timestamped serial communication logs next to the EXE |

@@ -16,6 +16,7 @@
 #include <array>
 #include <atomic>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iomanip>
 #include <map>
@@ -42,6 +43,22 @@ enum class ProductType {
     Camera,
     TalentTrack,
     LensProfiling
+};
+
+enum class DialogKind {
+    Info,
+    Warning,
+    Error
+};
+
+struct ModalDialog {
+    bool open = false;
+    bool requestOpen = false;
+    bool confirm = false;
+    DialogKind kind = DialogKind::Info;
+    std::string title;
+    std::string message;
+    std::function<void()> onConfirm;
 };
 
 struct DxState {
@@ -71,6 +88,7 @@ struct AppState {
     ProductType product = ProductType::Camera;
     int selectedProfile = 0;
     bool darkTheme = true;
+    ModalDialog dialog;
 };
 
 DxState g_dx;
@@ -158,6 +176,25 @@ void appendLog(const std::wstring& text) {
         g_app.logFile << wideToUtf8(lines);
         g_app.logFile.flush();
     }
+}
+
+void showDialog(
+    DialogKind kind,
+    const std::string& title,
+    const std::string& message,
+    bool confirm = false,
+    std::function<void()> onConfirm = {}) {
+    g_app.dialog.kind = kind;
+    g_app.dialog.title = title;
+    g_app.dialog.message = message;
+    g_app.dialog.confirm = confirm;
+    g_app.dialog.onConfirm = std::move(onConfirm);
+    g_app.dialog.open = true;
+    g_app.dialog.requestOpen = true;
+}
+
+void showErrorDialog(const std::exception& error) {
+    showDialog(DialogKind::Error, "Error", error.what());
 }
 
 void clearVisibleLog() {
@@ -364,7 +401,7 @@ void connectPort(const std::wstring& port) {
         g_app.tag.disconnect();
         g_app.connected = false;
         appendLog(L"\nERROR: " + utf8ToWide(error.what()) + L"\n");
-        MessageBoxW(nullptr, utf8ToWide(error.what()).c_str(), kAppTitle, MB_OK | MB_ICONERROR);
+        showErrorDialog(error);
     }
     g_app.busy = false;
 }
@@ -451,7 +488,7 @@ void importConfig() {
         appendLog(L"Config loaded into editor; it has not been written yet: " + path + L"\n");
     } catch (const std::exception& error) {
         appendLog(L"\nERROR: " + utf8ToWide(error.what()) + L"\n");
-        MessageBoxW(nullptr, utf8ToWide(error.what()).c_str(), kAppTitle, MB_OK | MB_ICONERROR);
+        showErrorDialog(error);
     }
 }
 
@@ -463,13 +500,8 @@ std::map<std::string, long long> collectValues() {
     return values;
 }
 
-void saveToTag() {
+void writeConfigToTag() {
     if (!g_app.connected) {
-        return;
-    }
-    if (MessageBoxW(nullptr,
-            L"Changes will be verified and written to the Active Tag flash memory. Continue?",
-            L"Confirm write", MB_YESNO | MB_ICONWARNING) != IDYES) {
         return;
     }
     g_app.busy = true;
@@ -477,12 +509,24 @@ void saveToTag() {
         const auto [saved, changes] = g_app.tag.apply(collectValues());
         renderSnapshot(saved);
         appendLog(L"Saved and verified " + std::to_wstring(changes.size()) + L" changed field(s).\n");
-        MessageBoxW(nullptr, L"Config saved and verified.", kAppTitle, MB_OK | MB_ICONINFORMATION);
+        showDialog(DialogKind::Info, "Config Saved", "Config saved and verified.");
     } catch (const std::exception& error) {
         appendLog(L"\nERROR: " + utf8ToWide(error.what()) + L"\n");
-        MessageBoxW(nullptr, utf8ToWide(error.what()).c_str(), kAppTitle, MB_OK | MB_ICONERROR);
+        showErrorDialog(error);
     }
     g_app.busy = false;
+}
+
+void confirmSaveToTag() {
+    if (!g_app.connected) {
+        return;
+    }
+    showDialog(
+        DialogKind::Warning,
+        "Confirm Write",
+        "Changes will be verified and written to the Active Tag flash memory.\n\nContinue?",
+        true,
+        []() { writeConfigToTag(); });
 }
 
 void setTheme() {
@@ -693,6 +737,85 @@ int visibleLedCount() {
     return 8;
 }
 
+void drawModalDialog() {
+    if (!g_app.dialog.open) {
+        return;
+    }
+    if (g_app.dialog.requestOpen) {
+        ImGui::OpenPopup(g_app.dialog.title.c_str());
+        g_app.dialog.requestOpen = false;
+    }
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(460.0f, 0.0f), ImGuiCond_Appearing);
+
+    bool keepOpen = true;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18, 16));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 7));
+    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, ImVec4(0.0f, 0.0f, 0.0f, 0.62f));
+    if (ImGui::BeginPopupModal(
+            g_app.dialog.title.c_str(),
+            &keepOpen,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        const char* icon = "i";
+        ImVec4 iconColor = ImVec4(0.18f, 0.55f, 1.0f, 1.0f);
+        if (g_app.dialog.kind == DialogKind::Warning) {
+            icon = "!";
+            iconColor = ImVec4(1.0f, 0.72f, 0.20f, 1.0f);
+        } else if (g_app.dialog.kind == DialogKind::Error) {
+            icon = "x";
+            iconColor = ImVec4(1.0f, 0.30f, 0.30f, 1.0f);
+        }
+
+        ImGui::TextColored(iconColor, "%s", icon);
+        ImGui::SameLine();
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
+        ImGui::TextUnformatted(g_app.dialog.message.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        const float buttonWidth = 120.0f;
+        const float totalWidth = g_app.dialog.confirm
+            ? buttonWidth * 2.0f + ImGui::GetStyle().ItemSpacing.x
+            : buttonWidth;
+        ImGui::SetCursorPosX(std::max(0.0f, (ImGui::GetWindowWidth() - totalWidth) * 0.5f));
+
+        bool runConfirm = false;
+        std::function<void()> confirmAction;
+        if (g_app.dialog.confirm) {
+            if (ImGui::Button("Yes", ImVec2(buttonWidth, 32))) {
+                confirmAction = g_app.dialog.onConfirm;
+                g_app.dialog = {};
+                ImGui::CloseCurrentPopup();
+                runConfirm = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("No", ImVec2(buttonWidth, 32))) {
+                g_app.dialog = {};
+                ImGui::CloseCurrentPopup();
+            }
+        } else if (ImGui::Button("OK", ImVec2(buttonWidth, 32))) {
+            g_app.dialog = {};
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (!keepOpen) {
+            g_app.dialog = {};
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+        if (runConfirm && confirmAction) {
+            confirmAction();
+        }
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+}
+
 void drawDeviceHeader() {
     if (!g_app.connected) {
         ImGui::TextColored(ImVec4(1.0f, 0.78f, 0.30f, 1.0f),
@@ -812,7 +935,7 @@ void drawMainUi() {
     }
     ImGui::SameLine();
     if (ImGui::Button("Save to Active Tag", ImVec2(actionButtonWidth, 32))) {
-        saveToTag();
+        confirmSaveToTag();
     }
     if (ImGui::Button("Export Config", ImVec2(actionButtonWidth, 32))) {
         exportConfig();
@@ -839,6 +962,7 @@ void drawMainUi() {
     ImGui::SetColumnWidth(0, 270);
     ImGui::TextUnformatted("LED Active IDs");
     ImGui::Separator();
+    ImGui::Dummy(ImVec2(0, 8));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 3));
     for (int led = 0; led < visibleLedCount(); ++led) {
@@ -848,6 +972,7 @@ void drawMainUi() {
     ImGui::NextColumn();
     ImGui::TextUnformatted("General Settings");
     ImGui::Separator();
+    ImGui::Dummy(ImVec2(0, 8));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
     drawNumberField("Uplink ID", "2");
@@ -888,6 +1013,7 @@ void drawMainUi() {
     ImGui::TextDisabled("View only. File stays append-only.");
     ImGui::EndChild();
     ImGui::End();
+    drawModalDialog();
 }
 
 }  // namespace
