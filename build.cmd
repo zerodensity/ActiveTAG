@@ -33,10 +33,17 @@ if errorlevel 1 (
 )
 
 cl /nologo /std:c++20 /O2 /W4 /EHsc /permissive- /DUNICODE /D_UNICODE /DNOMINMAX /MT ^
-  /I"..\third_party" ^
-  "..\src\main.cpp" "..\src\active_tag.cpp" "..\src\serial_port.cpp" "ActiveTAG-Configurator.res" ^
+  /I"..\third_party" /I"..\third_party\imgui" /I"..\third_party\imgui\backends" ^
+  "..\src\main_imgui.cpp" "..\src\active_tag.cpp" "..\src\serial_port.cpp" ^
+  "..\third_party\imgui\imgui.cpp" ^
+  "..\third_party\imgui\imgui_draw.cpp" ^
+  "..\third_party\imgui\imgui_tables.cpp" ^
+  "..\third_party\imgui\imgui_widgets.cpp" ^
+  "..\third_party\imgui\backends\imgui_impl_win32.cpp" ^
+  "..\third_party\imgui\backends\imgui_impl_dx11.cpp" ^
+  "ActiveTAG-Configurator.res" ^
   /link /SUBSYSTEM:WINDOWS /OUT:"ActiveTAG-Configurator-%APP_VERSION%.exe" ^
-  user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib dwmapi.lib uxtheme.lib
+  user32.lib gdi32.lib comdlg32.lib advapi32.lib d3d11.lib dxgi.lib imm32.lib
 
 set "RESULT=%ERRORLEVEL%"
 popd
