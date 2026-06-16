@@ -87,6 +87,7 @@ struct AppState {
     HWND log = nullptr;
     HFONT normalFont = nullptr;
     HFONT titleFont = nullptr;
+    HFONT tabFont = nullptr;
     activetag::ActiveTag tag;
     activetag::Snapshot snapshot;
     std::vector<FieldUi> fields;
@@ -107,6 +108,8 @@ struct AppState {
     COLORREF backgroundColor = RGB(246, 247, 249);
     COLORREF panelColor = RGB(255, 255, 255);
     COLORREF editColor = RGB(255, 255, 255);
+    COLORREF accentColor = RGB(21, 112, 239);
+    COLORREF accentTextColor = RGB(255, 255, 255);
 };
 
 AppState g;
@@ -262,12 +265,16 @@ void rebuildThemeBrushes() {
         g.editColor = RGB(42, 47, 53);
         g.textColor = RGB(238, 241, 244);
         g.mutedTextColor = RGB(166, 174, 182);
+        g.accentColor = RGB(45, 156, 219);
+        g.accentTextColor = RGB(255, 255, 255);
     } else {
         g.backgroundColor = RGB(246, 247, 249);
         g.panelColor = RGB(255, 255, 255);
         g.editColor = RGB(255, 255, 255);
         g.textColor = RGB(28, 32, 36);
         g.mutedTextColor = RGB(83, 91, 99);
+        g.accentColor = RGB(21, 112, 239);
+        g.accentTextColor = RGB(255, 255, 255);
     }
 
     g.backgroundBrush = CreateSolidBrush(g.backgroundColor);
@@ -789,6 +796,10 @@ void createUi(HWND window) {
         -20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+    g.tabFont = CreateFontW(
+        -13, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
 
     HWND title = createControl(L"STATIC", kAppTitle, SS_LEFT, 22, 14, 365, 29, 0);
     setFont(title, g.titleFont);
@@ -844,20 +855,20 @@ void createUi(HWND window) {
     g.productTabs = createControl(
         WC_TABCONTROLW,
         L"",
-        TCS_FIXEDWIDTH | TCS_SINGLELINE,
+        TCS_FIXEDWIDTH | TCS_SINGLELINE | TCS_OWNERDRAWFIXED,
         23,
         141,
         488,
-        31,
+        35,
         IDC_PRODUCT_TABS);
-    SendMessageW(g.productTabs, TCM_SETITEMSIZE, 0, MAKELPARAM(158, 25));
+    SendMessageW(g.productTabs, TCM_SETITEMSIZE, 0, MAKELPARAM(158, 29));
     TCITEMW tab{};
     tab.mask = TCIF_TEXT;
     tab.pszText = const_cast<wchar_t*>(L"CAM");
     SendMessageW(g.productTabs, TCM_INSERTITEM, 0, reinterpret_cast<LPARAM>(&tab));
     tab.pszText = const_cast<wchar_t*>(L"Talent Track");
     SendMessageW(g.productTabs, TCM_INSERTITEM, 1, reinterpret_cast<LPARAM>(&tab));
-    tab.pszText = const_cast<wchar_t*>(L"April Tags");
+    tab.pszText = const_cast<wchar_t*>(L"Lens Profiling");
     SendMessageW(g.productTabs, TCM_INSERTITEM, 2, reinterpret_cast<LPARAM>(&tab));
     SendMessageW(g.productTabs, TCM_SETCURSEL, 0, 0);
 
@@ -918,6 +929,82 @@ void createUi(HWND window) {
     SetTimer(window, kPortTimer, kPortScanIntervalMs, nullptr);
 }
 
+void drawProductTab(const DRAWITEMSTRUCT& item) {
+    if (item.itemID == static_cast<UINT>(-1)) {
+        return;
+    }
+
+    wchar_t label[64]{};
+    TCITEMW tab{};
+    tab.mask = TCIF_TEXT;
+    tab.pszText = label;
+    tab.cchTextMax = static_cast<int>(std::size(label));
+    SendMessageW(g.productTabs, TCM_GETITEM, item.itemID, reinterpret_cast<LPARAM>(&tab));
+
+    const bool selected =
+        item.itemState & ODS_SELECTED ||
+        static_cast<int>(item.itemID) ==
+            static_cast<int>(SendMessageW(g.productTabs, TCM_GETCURSEL, 0, 0));
+
+    RECT rect = item.rcItem;
+    InflateRect(&rect, selected ? -1 : -2, selected ? -1 : -3);
+    if (selected) {
+        rect.top -= 1;
+        rect.bottom += 1;
+    } else {
+        rect.top += 2;
+    }
+
+    const COLORREF fillColor = selected ? g.accentColor : g.panelColor;
+    const COLORREF borderColor = selected
+        ? (g.theme == ThemeMode::Dark ? RGB(92, 198, 255) : RGB(9, 77, 180))
+        : (g.theme == ThemeMode::Dark ? RGB(67, 74, 82) : RGB(198, 205, 214));
+    const COLORREF highlightColor = selected
+        ? (g.theme == ThemeMode::Dark ? RGB(119, 213, 255) : RGB(118, 180, 255))
+        : (g.theme == ThemeMode::Dark ? RGB(50, 56, 64) : RGB(255, 255, 255));
+    const COLORREF shadowColor = selected
+        ? (g.theme == ThemeMode::Dark ? RGB(14, 84, 122) : RGB(8, 67, 155))
+        : (g.theme == ThemeMode::Dark ? RGB(16, 18, 22) : RGB(180, 187, 196));
+
+    HBRUSH fillBrush = CreateSolidBrush(fillColor);
+    HPEN borderPen = CreatePen(PS_SOLID, 1, borderColor);
+    HGDIOBJ oldBrush = SelectObject(item.hDC, fillBrush);
+    HGDIOBJ oldPen = SelectObject(item.hDC, borderPen);
+    RoundRect(item.hDC, rect.left, rect.top, rect.right, rect.bottom, 8, 8);
+
+    HPEN highlightPen = CreatePen(PS_SOLID, 1, highlightColor);
+    SelectObject(item.hDC, highlightPen);
+    MoveToEx(item.hDC, rect.left + 4, rect.bottom - 2, nullptr);
+    LineTo(item.hDC, rect.left + 4, rect.top + 4);
+    LineTo(item.hDC, rect.right - 4, rect.top + 4);
+
+    HPEN shadowPen = CreatePen(PS_SOLID, 1, shadowColor);
+    SelectObject(item.hDC, shadowPen);
+    MoveToEx(item.hDC, rect.left + 5, rect.bottom - 2, nullptr);
+    LineTo(item.hDC, rect.right - 5, rect.bottom - 2);
+    LineTo(item.hDC, rect.right - 5, rect.top + 5);
+
+    SelectObject(item.hDC, oldPen);
+    SelectObject(item.hDC, oldBrush);
+    DeleteObject(shadowPen);
+    DeleteObject(highlightPen);
+    DeleteObject(borderPen);
+    DeleteObject(fillBrush);
+
+    SetBkMode(item.hDC, TRANSPARENT);
+    SetTextColor(item.hDC, selected ? g.accentTextColor : g.textColor);
+    HGDIOBJ oldFont = SelectObject(item.hDC, selected && g.tabFont ? g.tabFont : g.normalFont);
+    RECT textRect = rect;
+    textRect.top += selected ? 1 : 2;
+    DrawTextW(
+        item.hDC,
+        label,
+        -1,
+        &textRect,
+        DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    SelectObject(item.hDC, oldFont);
+}
+
 LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
         case WM_CREATE:
@@ -960,6 +1047,14 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             SetBkColor(dc, g.editColor);
             return reinterpret_cast<LRESULT>(
                 g.editBrush ? g.editBrush : GetSysColorBrush(COLOR_WINDOW));
+        }
+        case WM_DRAWITEM: {
+            const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+            if (item && item->CtlID == IDC_PRODUCT_TABS) {
+                drawProductTab(*item);
+                return TRUE;
+            }
+            return DefWindowProcW(window, message, wParam, lParam);
         }
         case WM_NOTIFY: {
             const auto* header = reinterpret_cast<NMHDR*>(lParam);
@@ -1065,6 +1160,9 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             }
             if (g.titleFont) {
                 DeleteObject(g.titleFont);
+            }
+            if (g.tabFont) {
+                DeleteObject(g.tabFont);
             }
             appendLog(L"ActiveTAG Configurator stopped.");
             if (g.logFile.is_open()) {

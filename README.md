@@ -33,7 +33,7 @@ Visual C++ runtime on the target computer.
 | Config import | Loads supported values into the editor before writing |
 | Manual override | Edits Uplink ID, RF Channel, LED Brightness, charging behavior and Custom LED IDs |
 | Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
-| Product tabs | Separates CAM, Talent Track, and April Tags profile families |
+| Product tabs | Separates CAM, Talent Track, and Lens Profiling profile families |
 | Talent Track | Applies Label Group 6-20 profiles with only LED 0 active |
 | Automatic profile selection | Opens the CAM or Talent Track tab after matching the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
