@@ -10,8 +10,27 @@ namespace activetag {
 namespace {
 
 std::string windowsError(const char* operation) {
-    const DWORD code = GetLastError();
+    return std::string(operation) + " failed. Windows error: " + std::to_string(GetLastError());
+}
+
+std::string windowsErrorCode(const char* operation, DWORD code) {
     return std::string(operation) + " failed. Windows error: " + std::to_string(code);
+}
+
+bool isRecoverableWriteError(DWORD code) {
+    return code == ERROR_BAD_COMMAND ||
+           code == ERROR_INVALID_HANDLE ||
+           code == ERROR_DEVICE_NOT_CONNECTED ||
+           code == ERROR_GEN_FAILURE;
+}
+
+std::string narrowAscii(const std::wstring& value) {
+    std::string result;
+    result.reserve(value.size());
+    for (const wchar_t character : value) {
+        result.push_back(character >= 0 && character <= 0x7f ? static_cast<char>(character) : '?');
+    }
+    return result;
 }
 
 }  // namespace
@@ -103,15 +122,46 @@ std::string SerialPort::command(const std::string& value, DWORD timeoutMs) {
         throw std::runtime_error("Active Tag is not connected.");
     }
 
-    PurgeComm(handle_, PURGE_RXCLEAR);
     const std::string payload = value + "\r";
     if (logCallback_) {
         logCallback_("TX > " + value);
     }
-    DWORD written = 0;
-    if (!WriteFile(handle_, payload.data(), static_cast<DWORD>(payload.size()), &written, nullptr) ||
-        written != payload.size()) {
-        throw std::runtime_error(windowsError("Writing serial command"));
+
+    bool sent = false;
+    DWORD lastWriteError = ERROR_SUCCESS;
+    for (int attempt = 0; attempt < 2 && !sent; ++attempt) {
+        ClearCommError(handle_, nullptr, nullptr);
+        PurgeComm(handle_, PURGE_RXCLEAR | PURGE_TXCLEAR);
+
+        DWORD written = 0;
+        if (WriteFile(handle_, payload.data(), static_cast<DWORD>(payload.size()), &written, nullptr) &&
+            written == payload.size()) {
+            sent = true;
+            break;
+        }
+
+        lastWriteError = GetLastError();
+        if (lastWriteError == ERROR_SUCCESS && written != payload.size()) {
+            lastWriteError = ERROR_WRITE_FAULT;
+        }
+
+        if (attempt == 0 && isRecoverableWriteError(lastWriteError) && !path_.empty()) {
+            const std::wstring currentPath = path_;
+            if (logCallback_) {
+                logCallback_(
+                    "Serial write failed with Windows error " +
+                    std::to_string(lastWriteError) +
+                    "; reopening " + narrowAscii(currentPath) +
+                    " and retrying.");
+            }
+            open(currentPath);
+            continue;
+        }
+    }
+
+    if (!sent) {
+        close();
+        throw std::runtime_error(windowsErrorCode("Writing serial command", lastWriteError));
     }
 
     std::string response;

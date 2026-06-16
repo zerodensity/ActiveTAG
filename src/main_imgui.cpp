@@ -37,7 +37,8 @@ namespace {
 constexpr wchar_t kWindowClass[] = L"ZeroDensityActiveTAGImGuiWindow";
 constexpr wchar_t kWindowTitle[] = ACTIVETAG_WINDOW_TITLE_W;
 constexpr wchar_t kAppTitle[] = ACTIVETAG_APP_TITLE_W;
-constexpr long long kLedDisabled = 0xFFFFFFFFLL;
+constexpr long long kLedDisabledWriteValue = 0x7FFFFFFFLL;
+constexpr long long kLedDisabledLegacyValue = 0xFFFFFFFFLL;
 
 enum class ProductType {
     Camera,
@@ -722,7 +723,9 @@ void drawLedField(int led) {
         ImGui::EndDisabled();
     }
     ImGui::TextDisabled(
-        value == kLedDisabled ? "Decimal: %lld  (Disabled)" : "Decimal: %lld",
+        (value == kLedDisabledWriteValue || value == kLedDisabledLegacyValue)
+            ? "Decimal: %lld  (Disabled)"
+            : "Decimal: %lld",
         value);
     ImGui::PopID();
 }

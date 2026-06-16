@@ -373,7 +373,7 @@ bool getEditNumber(HWND edit, long long& value) {
 
 void updateLedDecimal(FieldUi& field, long long value) {
     std::wstring text = L"Decimal: " + std::to_wstring(value);
-    if (value == 0xFFFFFFFFLL) {
+    if (value == 0x7FFFFFFFLL || value == 0xFFFFFFFFLL) {
         text += L"  (Disabled)";
     }
     SetWindowTextW(field.note, text.c_str());

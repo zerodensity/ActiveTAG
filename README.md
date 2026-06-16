@@ -59,7 +59,9 @@ The firmware 2.x configuration surface currently exposed by the application:
 
 Fields reported as `[-]` are read-only. `[1] (unsupported)` is never written.
 Signal Intensity is intentionally excluded from the editor and config files.
-An LED ID of `0xFFFFFFFF` (`4294967295`) disables that LED.
+Disabled LED IDs are treated as disabled when the firmware reports either
+`0x7FFFFFFF` (`2147483647`) or `0xFFFFFFFF` (`4294967295`). Talent Track
+profiles write the firmware-safe `0x7FFFFFFF` disabled value.
 
 ## Log File
 

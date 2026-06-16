@@ -87,11 +87,24 @@ int main() {
         }
         for (int led = 1; led < 8; ++led) {
             if (snapshot.fields.at("D" + std::to_string(led)).numericValue !=
-                0xFFFFFFFFLL) {
+                0x7FFFFFFFLL) {
                 std::cerr << "Talent Track disabled LED mismatch for group "
                           << group << ".\n";
                 return 1;
             }
+        }
+
+        auto legacyDisabled = talentGroups[index];
+        for (int led = 1; led < 8; ++led) {
+            legacyDisabled[led] = 0xFFFFFFFFLL;
+        }
+        const auto legacySnapshot =
+            activetag::ActiveTag::parseDump(talentTrackDump(group, legacyDisabled));
+        if (!legacySnapshot.detectedTalentTrackGroup ||
+            *legacySnapshot.detectedTalentTrackGroup != group) {
+            std::cerr << "Legacy disabled Talent Track mismatch for Label Group "
+                      << group << ".\n";
+            return 1;
         }
     }
 

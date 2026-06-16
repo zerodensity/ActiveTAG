@@ -14,6 +14,9 @@ namespace {
 const std::set<std::string> documentedFirmware2Fields = {
     "2", "3", "4", "5", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"};
 
+constexpr long long disabledLedWriteValue = 0x7FFFFFFFLL;
+constexpr long long disabledLedLegacyValue = 0xFFFFFFFFLL;
+
 std::string trim(std::string value) {
     const auto first = value.find_first_not_of(" \t\r\n");
     if (first == std::string::npos) {
@@ -32,6 +35,17 @@ std::optional<long long> parseNumber(const std::string& value) {
         return std::stoll(match[1].str(), nullptr, 10);
     }
     return std::nullopt;
+}
+
+bool isDisabledLedValue(long long value) {
+    return value == disabledLedWriteValue || value == disabledLedLegacyValue;
+}
+
+bool fieldMatchesExpectedLed(long long actual, long long expected) {
+    if (isDisabledLedValue(expected)) {
+        return isDisabledLedValue(actual);
+    }
+    return actual == expected;
 }
 
 }  // namespace
@@ -186,7 +200,7 @@ std::optional<int> ActiveTag::detectLabelGroup(const Snapshot& snapshot) {
             const auto fieldIt = snapshot.fields.find("D" + std::to_string(led));
             if (fieldIt == snapshot.fields.end() ||
                 !fieldIt->second.hasNumericValue ||
-                fieldIt->second.numericValue != labelGroups()[group][led]) {
+                !fieldMatchesExpectedLed(fieldIt->second.numericValue, labelGroups()[group][led])) {
                 matches = false;
                 break;
             }
@@ -215,7 +229,7 @@ std::optional<int> ActiveTag::detectTalentTrackGroup(const Snapshot& snapshot) {
             const auto fieldIt = snapshot.fields.find("D" + std::to_string(led));
             if (fieldIt == snapshot.fields.end() ||
                 !fieldIt->second.hasNumericValue ||
-                fieldIt->second.numericValue != talentTrackGroups()[index][led]) {
+                !fieldMatchesExpectedLed(fieldIt->second.numericValue, talentTrackGroups()[index][led])) {
                 matches = false;
                 break;
             }
@@ -240,7 +254,7 @@ const std::array<std::array<long long, 8>, 6>& ActiveTag::labelGroups() {
 }
 
 const std::array<std::array<long long, 8>, 15>& ActiveTag::talentTrackGroups() {
-    constexpr long long disabled = 0xFFFFFFFFLL;
+    constexpr long long disabled = disabledLedWriteValue;
     static const std::array<std::array<long long, 8>, 15> groups = {{
         {{0x201, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
         {{0x14, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
