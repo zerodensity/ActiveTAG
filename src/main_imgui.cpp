@@ -607,7 +607,9 @@ void drawProfileCombo() {
         g_app.selectedProfile = 0;
     }
     const char* preview = names[g_app.selectedProfile].c_str();
-    if (ImGui::BeginCombo("Profile", preview)) {
+    ImGui::TextUnformatted("Profile");
+    ImGui::SetNextItemWidth(380.0f);
+    if (ImGui::BeginCombo("##profile", preview)) {
         for (int index = 0; index < static_cast<int>(names.size()); ++index) {
             const bool selected = index == g_app.selectedProfile;
             if (ImGui::Selectable(names[index].c_str(), selected)) {
@@ -623,7 +625,9 @@ void drawProfileCombo() {
 
 void drawNumberField(const char* label, const std::string& id) {
     int value = static_cast<int>(g_app.values[id]);
-    if (ImGui::InputInt(label, &value)) {
+    ImGui::TextUnformatted(label);
+    ImGui::SetNextItemWidth(190.0f);
+    if (ImGui::InputInt(("##" + id).c_str(), &value, 0, 0)) {
         g_app.values[id] = std::max(0, value);
     }
 }
@@ -639,7 +643,10 @@ void drawLedField(int led) {
     char buffer[32]{};
     strcpy_s(buffer, text.c_str());
     const std::string label = "LED " + std::to_string(led) + " Active ID";
-    if (ImGui::InputText(label.c_str(), buffer, static_cast<size_t>(std::size(buffer)),
+    ImGui::PushID(led);
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::SetNextItemWidth(190.0f);
+    if (ImGui::InputText("##hex", buffer, static_cast<size_t>(std::size(buffer)),
             ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsUppercase)) {
         long long parsed = 0;
         std::string input = buffer;
@@ -657,6 +664,17 @@ void drawLedField(int led) {
     ImGui::TextDisabled(
         value == kLedDisabled ? "Decimal: %lld  (Disabled)" : "Decimal: %lld",
         value);
+    ImGui::PopID();
+}
+
+int visibleLedCount() {
+    if (g_app.product == ProductType::TalentTrack) {
+        return 1;
+    }
+    if (g_app.product == ProductType::LensProfiling) {
+        return 4;
+    }
+    return 8;
 }
 
 void drawDeviceHeader() {
@@ -682,7 +700,8 @@ void drawMainUi() {
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::Begin("ActiveTAG", nullptr,
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoSavedSettings);
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse);
 
     ImGui::Text("%s", wideToUtf8(kAppTitle).c_str());
     ImGui::SameLine(ImGui::GetWindowWidth() - 145);
@@ -695,13 +714,14 @@ void drawMainUi() {
 
     drawDeviceHeader();
 
-    ImGui::BeginChild("TopCard", ImVec2(0, 118), true);
+    ImGui::BeginChild("TopCard", ImVec2(0, 160), true);
     ImGui::Columns(2, nullptr, false);
     ImGui::SetColumnWidth(0, 520);
 
     ImGui::TextUnformatted("COM Port");
     ImGui::SameLine(95);
     const std::string selectedPortUtf8 = wideToUtf8(g_app.selectedPort);
+    ImGui::SetNextItemWidth(290.0f);
     if (ImGui::BeginCombo("##ports", selectedPortUtf8.empty() ? "Select COM" : selectedPortUtf8.c_str())) {
         for (const auto& port : g_app.ports) {
             const std::string name = wideToUtf8(port.path);
@@ -757,12 +777,18 @@ void drawMainUi() {
     ImGui::EndChild();
 
     const float logWidth = 390.0f;
-    ImGui::BeginChild("Editor", ImVec2(ImGui::GetContentRegionAvail().x - logWidth - 10, 0), true);
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    const float lowerHeight = available.y;
+    ImGui::BeginChild(
+        "Editor",
+        ImVec2(std::max(360.0f, available.x - logWidth - 10.0f), lowerHeight),
+        true,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::Columns(2, nullptr, false);
     ImGui::SetColumnWidth(0, 270);
     ImGui::TextUnformatted("LED Active IDs");
     ImGui::Separator();
-    for (int led = 0; led < 8; ++led) {
+    for (int led = 0; led < visibleLedCount(); ++led) {
         drawLedField(led);
     }
     ImGui::NextColumn();
@@ -776,7 +802,7 @@ void drawMainUi() {
     ImGui::EndChild();
 
     ImGui::SameLine();
-    ImGui::BeginChild("Log", ImVec2(logWidth, 0), true);
+    ImGui::BeginChild("Log", ImVec2(logWidth, lowerHeight), true);
     ImGui::TextUnformatted("Serial Communication Log");
     ImGui::Separator();
     std::vector<std::wstring> lines;
