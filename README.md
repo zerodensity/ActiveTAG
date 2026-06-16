@@ -74,6 +74,9 @@ line, including serial device responses, receives a local timestamp with
 millisecond precision. The file is flushed as events are written and closed
 when the application exits.
 
+The in-app `Clear Log` button clears only the visible log panel. The physical
+log file remains append-only for diagnostics history.
+
 Run the portable EXE from a folder where the current Windows user has write
 permission.
 

@@ -160,6 +160,18 @@ void appendLog(const std::wstring& text) {
     }
 }
 
+void clearVisibleLog() {
+    {
+        std::scoped_lock lock(g_app.mutex);
+        g_app.uiLog.clear();
+    }
+    if (g_app.logFile.is_open()) {
+        g_app.logFile << wideToUtf8(
+            timestampLines(L"UI log view cleared from the application window.\n"));
+        g_app.logFile.flush();
+    }
+}
+
 std::wstring metadataValue(const activetag::Snapshot& snapshot, const std::string& key) {
     const auto it = snapshot.metadata.find(key);
     return it == snapshot.metadata.end() ? L"-" : utf8ToWide(it->second);
@@ -489,6 +501,7 @@ void setTheme() {
     style.WindowPadding = ImVec2(16, 14);
     style.ItemSpacing = ImVec2(10, 8);
     style.FramePadding = ImVec2(10, 6);
+    style.ScrollbarSize = 12.0f;
     style.Colors[ImGuiCol_Header] = ImVec4(0.07f, 0.42f, 0.88f, 0.75f);
     style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.09f, 0.50f, 0.95f, 0.90f);
     style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.06f, 0.36f, 0.78f, 1.0f);
@@ -580,6 +593,9 @@ void drawProductSelector() {
     ImGui::TextUnformatted("Product");
     const char* labels[] = {"CAM", "Talent Track", "Lens Profiling"};
     const int current = productIndex(g_app.product);
+    const float available = ImGui::GetContentRegionAvail().x;
+    const float buttonWidth = std::clamp((available - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f,
+        120.0f, 145.0f);
     for (int index = 0; index < 3; ++index) {
         if (index > 0) {
             ImGui::SameLine();
@@ -594,7 +610,7 @@ void drawProductSelector() {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
         }
-        if (ImGui::Button(labels[index], ImVec2(145, 38))) {
+        if (ImGui::Button(labels[index], ImVec2(buttonWidth, 34))) {
             selectProduct(productFromIndex(index), 0, false);
         }
         ImGui::PopStyleColor(3);
@@ -608,7 +624,7 @@ void drawProfileCombo() {
     }
     const char* preview = names[g_app.selectedProfile].c_str();
     ImGui::TextUnformatted("Profile");
-    ImGui::SetNextItemWidth(380.0f);
+    ImGui::SetNextItemWidth(std::min(390.0f, ImGui::GetContentRegionAvail().x));
     if (ImGui::BeginCombo("##profile", preview)) {
         for (int index = 0; index < static_cast<int>(names.size()); ++index) {
             const bool selected = index == g_app.selectedProfile;
@@ -626,7 +642,7 @@ void drawProfileCombo() {
 void drawNumberField(const char* label, const std::string& id) {
     int value = static_cast<int>(g_app.values[id]);
     ImGui::TextUnformatted(label);
-    ImGui::SetNextItemWidth(190.0f);
+    ImGui::SetNextItemWidth(std::min(190.0f, ImGui::GetContentRegionAvail().x));
     if (ImGui::InputInt(("##" + id).c_str(), &value, 0, 0)) {
         g_app.values[id] = std::max(0, value);
     }
@@ -645,7 +661,7 @@ void drawLedField(int led) {
     const std::string label = "LED " + std::to_string(led) + " Active ID";
     ImGui::PushID(led);
     ImGui::TextUnformatted(label.c_str());
-    ImGui::SetNextItemWidth(190.0f);
+    ImGui::SetNextItemWidth(std::min(210.0f, ImGui::GetContentRegionAvail().x));
     if (ImGui::InputText("##hex", buffer, static_cast<size_t>(std::size(buffer)),
             ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsUppercase)) {
         long long parsed = 0;
@@ -714,14 +730,39 @@ void drawMainUi() {
 
     drawDeviceHeader();
 
-    ImGui::BeginChild("TopCard", ImVec2(0, 160), true);
-    ImGui::Columns(2, nullptr, false);
-    ImGui::SetColumnWidth(0, 520);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 10));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
+    ImGui::BeginChild(
+        "TopCard",
+        ImVec2(0, 168),
+        true,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    const float topWidth = ImGui::GetContentRegionAvail().x;
+    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    float actionWidth = std::clamp(topWidth * 0.44f, 420.0f, 500.0f);
+    float leftWidth = topWidth - actionWidth - gap;
+    if (leftWidth < 500.0f) {
+        leftWidth = std::max(430.0f, topWidth - 390.0f - gap);
+        actionWidth = std::max(360.0f, topWidth - leftWidth - gap);
+    }
+
+    ImGui::BeginChild(
+        "ConnectionPanel",
+        ImVec2(leftWidth, 0),
+        false,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     ImGui::TextUnformatted("COM Port");
     ImGui::SameLine(95);
     const std::string selectedPortUtf8 = wideToUtf8(g_app.selectedPort);
-    ImGui::SetNextItemWidth(290.0f);
+    const float connectButtonWidth = g_app.connected ? 96.0f : 86.0f;
+    const float comboWidth = std::clamp(
+        leftWidth - 95.0f - 78.0f - connectButtonWidth - gap * 3.0f,
+        180.0f,
+        285.0f);
+    ImGui::SetNextItemWidth(comboWidth);
     if (ImGui::BeginCombo("##ports", selectedPortUtf8.empty() ? "Select COM" : selectedPortUtf8.c_str())) {
         for (const auto& port : g_app.ports) {
             const std::string name = wideToUtf8(port.path);
@@ -733,48 +774,58 @@ void drawMainUi() {
         ImGui::EndCombo();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Refresh")) {
+    if (ImGui::Button("Refresh", ImVec2(78, 32))) {
         refreshPorts();
         startAutoProbe();
     }
     ImGui::SameLine();
     if (!g_app.connected) {
-        if (ImGui::Button("Connect")) {
+        if (ImGui::Button("Connect", ImVec2(connectButtonWidth, 32))) {
             connectPort(g_app.selectedPort);
         }
-    } else if (ImGui::Button("Disconnect")) {
+    } else if (ImGui::Button("Disconnect", ImVec2(connectButtonWidth, 32))) {
         g_app.tag.disconnect();
         g_app.connected = false;
         appendLog(L"Disconnected.\n");
     }
+    drawProductSelector();
+    drawProfileCombo();
+    ImGui::EndChild();
+
     ImGui::SameLine();
-    if (ImGui::Button("Read Again") && g_app.connected) {
+    ImGui::BeginChild(
+        "ActionsPanel",
+        ImVec2(actionWidth, 0),
+        false,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::TextUnformatted("Actions");
+    const float actionButtonWidth = std::max(
+        150.0f,
+        (ImGui::GetContentRegionAvail().x - gap) / 2.0f);
+    ImGui::BeginDisabled(!g_app.connected);
+    if (ImGui::Button("Read Again", ImVec2(actionButtonWidth, 32))) {
         try {
             renderSnapshot(g_app.tag.read());
         } catch (const std::exception& error) {
             appendLog(L"\nERROR: " + utf8ToWide(error.what()) + L"\n");
         }
     }
-
-    drawProductSelector();
-    drawProfileCombo();
-
-    ImGui::NextColumn();
-    ImGui::TextUnformatted("Actions");
-    if (ImGui::Button("Export Config", ImVec2(135, 32)) && g_app.connected) {
+    ImGui::SameLine();
+    if (ImGui::Button("Save to Active Tag", ImVec2(actionButtonWidth, 32))) {
+        saveToTag();
+    }
+    if (ImGui::Button("Export Config", ImVec2(actionButtonWidth, 32))) {
         exportConfig();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Import Config", ImVec2(135, 32)) && g_app.connected) {
+    if (ImGui::Button("Import Config", ImVec2(actionButtonWidth, 32))) {
         importConfig();
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Save to Active Tag", ImVec2(155, 32)) && g_app.connected) {
-        saveToTag();
-    }
+    ImGui::EndDisabled();
     ImGui::TextDisabled("Ready-made profiles lock LED IDs. Custom unlocks them.");
-    ImGui::Columns(1);
     ImGui::EndChild();
+    ImGui::EndChild();
+    ImGui::PopStyleVar(3);
 
     const float logWidth = 390.0f;
     const ImVec2 available = ImGui::GetContentRegionAvail();
@@ -788,23 +839,35 @@ void drawMainUi() {
     ImGui::SetColumnWidth(0, 270);
     ImGui::TextUnformatted("LED Active IDs");
     ImGui::Separator();
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 1));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 3));
     for (int led = 0; led < visibleLedCount(); ++led) {
         drawLedField(led);
     }
+    ImGui::PopStyleVar(2);
     ImGui::NextColumn();
     ImGui::TextUnformatted("General Settings");
     ImGui::Separator();
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 6));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
     drawNumberField("Uplink ID", "2");
     drawNumberField("RF Channel", "3");
     drawNumberField("LED Brightness", "4");
     drawNumberField("On While Charging", "5");
+    ImGui::PopStyleVar(2);
     ImGui::Columns(1);
     ImGui::EndChild();
 
     ImGui::SameLine();
-    ImGui::BeginChild("Log", ImVec2(logWidth, lowerHeight), true);
+    ImGui::BeginChild(
+        "Log",
+        ImVec2(logWidth, lowerHeight),
+        true,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::TextUnformatted("Serial Communication Log");
     ImGui::Separator();
+    const float footerHeight = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y + 2.0f;
+    ImGui::BeginChild("LogLines", ImVec2(0, -footerHeight), false);
     std::vector<std::wstring> lines;
     {
         std::scoped_lock lock(g_app.mutex);
@@ -816,6 +879,13 @@ void drawMainUi() {
     if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 5.0f) {
         ImGui::SetScrollHereY(1.0f);
     }
+    ImGui::EndChild();
+    ImGui::Separator();
+    if (ImGui::Button("Clear Log", ImVec2(110, 30))) {
+        clearVisibleLog();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("View only. File stays append-only.");
     ImGui::EndChild();
     ImGui::End();
 }
