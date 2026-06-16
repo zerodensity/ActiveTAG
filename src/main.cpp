@@ -45,7 +45,9 @@ enum ControlId {
     IDC_IMPORT,
     IDC_SAVE,
     IDC_GROUP,
-    IDC_PRODUCT_TABS,
+    IDC_PRODUCT_CAM,
+    IDC_PRODUCT_TALENT,
+    IDC_PRODUCT_LENS,
     IDC_THEME,
     IDC_LOG,
     IDC_DEVICE_INFO,
@@ -68,7 +70,7 @@ enum class ThemeMode {
 enum class ProductType {
     Camera,
     TalentTrack,
-    AprilTags
+    LensProfiling
 };
 
 struct AppState {
@@ -81,7 +83,7 @@ struct AppState {
     HWND importButton = nullptr;
     HWND saveButton = nullptr;
     HWND groupCombo = nullptr;
-    HWND productTabs = nullptr;
+    std::array<HWND, 3> productButtons{};
     HWND themeCombo = nullptr;
     HWND deviceInfo = nullptr;
     HWND log = nullptr;
@@ -289,8 +291,7 @@ BOOL CALLBACK applyThemeToControl(HWND control, LPARAM) {
 
     if (_wcsicmp(className, L"Button") == 0 ||
         _wcsicmp(className, L"ComboBox") == 0 ||
-        _wcsicmp(className, L"Edit") == 0 ||
-        _wcsicmp(className, WC_TABCONTROLW) == 0) {
+        _wcsicmp(className, L"Edit") == 0) {
         SetWindowTheme(control, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
     }
     InvalidateRect(control, nullptr, TRUE);
@@ -424,18 +425,45 @@ void populateProfileCombo(int selectedProfile = 0) {
     SendMessageW(g.groupCombo, CB_SETCURSEL, safeSelection, 0);
 }
 
+int productIndex(ProductType product) {
+    return product == ProductType::Camera
+        ? 0
+        : product == ProductType::TalentTrack ? 1 : 2;
+}
+
+ProductType productFromButtonId(int id) {
+    if (id == IDC_PRODUCT_TALENT) {
+        return ProductType::TalentTrack;
+    }
+    if (id == IDC_PRODUCT_LENS) {
+        return ProductType::LensProfiling;
+    }
+    return ProductType::Camera;
+}
+
+const wchar_t* productLabel(ProductType product) {
+    if (product == ProductType::TalentTrack) {
+        return L"Talent Track";
+    }
+    if (product == ProductType::LensProfiling) {
+        return L"Lens Profiling";
+    }
+    return L"CAM";
+}
+
 void selectProduct(
     ProductType product,
     int selectedProfile = 0,
     bool lockLedFields = false) {
     g.product = product;
-    const int tabIndex = product == ProductType::Camera
-        ? 0
-        : product == ProductType::TalentTrack ? 1 : 2;
-    SendMessageW(g.productTabs, TCM_SETCURSEL, tabIndex, 0);
     populateProfileCombo(selectedProfile);
     g.ledFieldsLocked = lockLedFields;
     updateFieldEnableState();
+    for (HWND button : g.productButtons) {
+        if (IsWindow(button)) {
+            InvalidateRect(button, nullptr, TRUE);
+        }
+    }
 }
 
 void renderSnapshot(const activetag::Snapshot& snapshot) {
@@ -852,25 +880,34 @@ void createUi(HWND window) {
         20,
         IDC_DEVICE_INFO);
 
-    g.productTabs = createControl(
-        WC_TABCONTROLW,
-        L"",
-        TCS_FIXEDWIDTH | TCS_SINGLELINE | TCS_OWNERDRAWFIXED,
-        23,
-        141,
-        488,
-        35,
-        IDC_PRODUCT_TABS);
-    SendMessageW(g.productTabs, TCM_SETITEMSIZE, 0, MAKELPARAM(158, 29));
-    TCITEMW tab{};
-    tab.mask = TCIF_TEXT;
-    tab.pszText = const_cast<wchar_t*>(L"CAM");
-    SendMessageW(g.productTabs, TCM_INSERTITEM, 0, reinterpret_cast<LPARAM>(&tab));
-    tab.pszText = const_cast<wchar_t*>(L"Talent Track");
-    SendMessageW(g.productTabs, TCM_INSERTITEM, 1, reinterpret_cast<LPARAM>(&tab));
-    tab.pszText = const_cast<wchar_t*>(L"Lens Profiling");
-    SendMessageW(g.productTabs, TCM_INSERTITEM, 2, reinterpret_cast<LPARAM>(&tab));
-    SendMessageW(g.productTabs, TCM_SETCURSEL, 0, 0);
+    createControl(L"STATIC", L"Product", SS_LEFT, 23, 142, 65, 18, 0);
+    g.productButtons[0] = createControl(
+        L"BUTTON",
+        L"CAM",
+        BS_OWNERDRAW | BS_PUSHBUTTON,
+        88,
+        137,
+        126,
+        34,
+        IDC_PRODUCT_CAM);
+    g.productButtons[1] = createControl(
+        L"BUTTON",
+        L"Talent Track",
+        BS_OWNERDRAW | BS_PUSHBUTTON,
+        221,
+        137,
+        136,
+        34,
+        IDC_PRODUCT_TALENT);
+    g.productButtons[2] = createControl(
+        L"BUTTON",
+        L"Lens Profiling",
+        BS_OWNERDRAW | BS_PUSHBUTTON,
+        364,
+        137,
+        147,
+        34,
+        IDC_PRODUCT_LENS);
 
     createControl(L"STATIC", L"Profile", SS_LEFT, 23, 187, 117, 18, 0);
     g.groupCombo = createControl(
@@ -929,76 +966,57 @@ void createUi(HWND window) {
     SetTimer(window, kPortTimer, kPortScanIntervalMs, nullptr);
 }
 
-void drawProductTab(const DRAWITEMSTRUCT& item) {
-    if (item.itemID == static_cast<UINT>(-1)) {
-        return;
-    }
-
-    wchar_t label[64]{};
-    TCITEMW tab{};
-    tab.mask = TCIF_TEXT;
-    tab.pszText = label;
-    tab.cchTextMax = static_cast<int>(std::size(label));
-    SendMessageW(g.productTabs, TCM_GETITEM, item.itemID, reinterpret_cast<LPARAM>(&tab));
-
-    const bool selected =
-        item.itemState & ODS_SELECTED ||
-        static_cast<int>(item.itemID) ==
-            static_cast<int>(SendMessageW(g.productTabs, TCM_GETCURSEL, 0, 0));
+void drawProductSegment(const DRAWITEMSTRUCT& item) {
+    const ProductType product = productFromButtonId(item.CtlID);
+    const bool selected = product == g.product;
+    const bool pressed = (item.itemState & ODS_SELECTED) != 0;
 
     RECT rect = item.rcItem;
-    InflateRect(&rect, selected ? -1 : -2, selected ? -1 : -3);
-    if (selected) {
-        rect.top -= 1;
-        rect.bottom += 1;
-    } else {
-        rect.top += 2;
+    FillRect(item.hDC, &rect, g.backgroundBrush ? g.backgroundBrush : GetSysColorBrush(COLOR_WINDOW));
+    InflateRect(&rect, -1, -1);
+    if (pressed && !selected) {
+        OffsetRect(&rect, 0, 1);
     }
 
-    const COLORREF fillColor = selected ? g.accentColor : g.panelColor;
+    const COLORREF fillColor = selected
+        ? g.accentColor
+        : (g.theme == ThemeMode::Dark ? RGB(38, 43, 49) : RGB(255, 255, 255));
     const COLORREF borderColor = selected
-        ? (g.theme == ThemeMode::Dark ? RGB(92, 198, 255) : RGB(9, 77, 180))
-        : (g.theme == ThemeMode::Dark ? RGB(67, 74, 82) : RGB(198, 205, 214));
-    const COLORREF highlightColor = selected
-        ? (g.theme == ThemeMode::Dark ? RGB(119, 213, 255) : RGB(118, 180, 255))
-        : (g.theme == ThemeMode::Dark ? RGB(50, 56, 64) : RGB(255, 255, 255));
-    const COLORREF shadowColor = selected
-        ? (g.theme == ThemeMode::Dark ? RGB(14, 84, 122) : RGB(8, 67, 155))
-        : (g.theme == ThemeMode::Dark ? RGB(16, 18, 22) : RGB(180, 187, 196));
+        ? g.accentColor
+        : (g.theme == ThemeMode::Dark ? RGB(72, 80, 90) : RGB(197, 207, 219));
+    const COLORREF textColor = selected
+        ? g.accentTextColor
+        : (g.theme == ThemeMode::Dark ? RGB(221, 226, 232) : RGB(40, 48, 56));
 
     HBRUSH fillBrush = CreateSolidBrush(fillColor);
-    HPEN borderPen = CreatePen(PS_SOLID, 1, borderColor);
+    HPEN borderPen = CreatePen(PS_SOLID, selected ? 2 : 1, borderColor);
     HGDIOBJ oldBrush = SelectObject(item.hDC, fillBrush);
     HGDIOBJ oldPen = SelectObject(item.hDC, borderPen);
-    RoundRect(item.hDC, rect.left, rect.top, rect.right, rect.bottom, 8, 8);
-
-    HPEN highlightPen = CreatePen(PS_SOLID, 1, highlightColor);
-    SelectObject(item.hDC, highlightPen);
-    MoveToEx(item.hDC, rect.left + 4, rect.bottom - 2, nullptr);
-    LineTo(item.hDC, rect.left + 4, rect.top + 4);
-    LineTo(item.hDC, rect.right - 4, rect.top + 4);
-
-    HPEN shadowPen = CreatePen(PS_SOLID, 1, shadowColor);
-    SelectObject(item.hDC, shadowPen);
-    MoveToEx(item.hDC, rect.left + 5, rect.bottom - 2, nullptr);
-    LineTo(item.hDC, rect.right - 5, rect.bottom - 2);
-    LineTo(item.hDC, rect.right - 5, rect.top + 5);
-
+    RoundRect(item.hDC, rect.left, rect.top, rect.right, rect.bottom, 18, 18);
     SelectObject(item.hDC, oldPen);
     SelectObject(item.hDC, oldBrush);
-    DeleteObject(shadowPen);
-    DeleteObject(highlightPen);
     DeleteObject(borderPen);
     DeleteObject(fillBrush);
 
+    if (selected) {
+        RECT indicator = rect;
+        indicator.left += 18;
+        indicator.right -= 18;
+        indicator.top = indicator.bottom - 4;
+        HBRUSH indicatorBrush = CreateSolidBrush(
+            g.theme == ThemeMode::Dark ? RGB(180, 232, 255) : RGB(210, 231, 255));
+        FillRect(item.hDC, &indicator, indicatorBrush);
+        DeleteObject(indicatorBrush);
+    }
+
     SetBkMode(item.hDC, TRANSPARENT);
-    SetTextColor(item.hDC, selected ? g.accentTextColor : g.textColor);
+    SetTextColor(item.hDC, textColor);
     HGDIOBJ oldFont = SelectObject(item.hDC, selected && g.tabFont ? g.tabFont : g.normalFont);
     RECT textRect = rect;
-    textRect.top += selected ? 1 : 2;
+    textRect.bottom -= selected ? 1 : 0;
     DrawTextW(
         item.hDC,
-        label,
+        productLabel(product),
         -1,
         &textRect,
         DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
@@ -1050,23 +1068,12 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         case WM_DRAWITEM: {
             const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
-            if (item && item->CtlID == IDC_PRODUCT_TABS) {
-                drawProductTab(*item);
+            if (item && (
+                    item->CtlID == IDC_PRODUCT_CAM ||
+                    item->CtlID == IDC_PRODUCT_TALENT ||
+                    item->CtlID == IDC_PRODUCT_LENS)) {
+                drawProductSegment(*item);
                 return TRUE;
-            }
-            return DefWindowProcW(window, message, wParam, lParam);
-        }
-        case WM_NOTIFY: {
-            const auto* header = reinterpret_cast<NMHDR*>(lParam);
-            if (header && header->idFrom == IDC_PRODUCT_TABS &&
-                header->code == TCN_SELCHANGE) {
-                const int selection = static_cast<int>(
-                    SendMessageW(g.productTabs, TCM_GETCURSEL, 0, 0));
-                selectProduct(
-                    selection == 1
-                        ? ProductType::TalentTrack
-                        : selection == 2 ? ProductType::AprilTags : ProductType::Camera);
-                return 0;
             }
             return DefWindowProcW(window, message, wParam, lParam);
         }
@@ -1118,6 +1125,11 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                     return 0;
                 case IDC_SAVE:
                     saveToTag();
+                    return 0;
+                case IDC_PRODUCT_CAM:
+                case IDC_PRODUCT_TALENT:
+                case IDC_PRODUCT_LENS:
+                    selectProduct(productFromButtonId(id));
                     return 0;
                 case IDC_GROUP:
                     if (notification == CBN_SELCHANGE) {
