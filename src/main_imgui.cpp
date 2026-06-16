@@ -727,6 +727,19 @@ void drawLedField(int led) {
     ImGui::PopID();
 }
 
+void drawSectionHeader(const char* label) {
+    ImGui::TextUnformatted(label);
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ImU32 color = ImGui::GetColorU32(ImGuiCol_Separator);
+    drawList->AddLine(
+        ImVec2(start.x, start.y + 3.0f),
+        ImVec2(start.x + width, start.y + 3.0f),
+        color);
+    ImGui::Dummy(ImVec2(0, 12));
+}
+
 int visibleLedCount() {
     if (g_app.product == ProductType::TalentTrack) {
         return 1;
@@ -960,9 +973,7 @@ void drawMainUi() {
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::Columns(2, nullptr, false);
     ImGui::SetColumnWidth(0, 270);
-    ImGui::TextUnformatted("LED Active IDs");
-    ImGui::Separator();
-    ImGui::Dummy(ImVec2(0, 8));
+    drawSectionHeader("LED Active IDs");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 3));
     for (int led = 0; led < visibleLedCount(); ++led) {
@@ -970,9 +981,7 @@ void drawMainUi() {
     }
     ImGui::PopStyleVar(2);
     ImGui::NextColumn();
-    ImGui::TextUnformatted("General Settings");
-    ImGui::Separator();
-    ImGui::Dummy(ImVec2(0, 8));
+    drawSectionHeader("General Settings");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
     drawNumberField("Uplink ID", "2");
