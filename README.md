@@ -9,7 +9,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-167D6B">
   <img alt="Language" src="https://img.shields.io/badge/C%2B%2B-20-167D6B">
-  <img alt="UI" src="https://img.shields.io/badge/UI-Win32-167D6B">
+  <img alt="UI" src="https://img.shields.io/badge/UI-Dear%20ImGui%20%2B%20DirectX%2011-167D6B">
   <img alt="Runtime" src="https://img.shields.io/badge/runtime-static%20%2FMT-167D6B">
 </p>
 
@@ -19,9 +19,10 @@ ActiveTAG Configurator connects directly to the virtual serial port exposed by
 OptiTrack Active Tags. It reads the current device configuration, recognizes
 known Label Group profiles, and safely writes selected settings back to flash.
 
-The application is a native C++ desktop executable. It does not run a web
-server, embed a browser engine, or require Node.js, .NET, Java, or a separate
-Visual C++ runtime on the target computer.
+The application is a native C++ desktop executable with a Dear ImGui and
+DirectX 11 interface. It does not run a web server, embed a browser engine, or
+require Node.js, .NET, Java, or a separate Visual C++ runtime on the target
+computer.
 
 ## Features
 
@@ -37,7 +38,7 @@ Visual C++ runtime on the target computer.
 | Talent Track | Applies Label Group 6-20 profiles with only LED 0 active |
 | Automatic profile selection | Opens the CAM or Talent Track tab after matching the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
-| Native themes | Switches between coordinated Light and Dark Win32 themes |
+| Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
 | Persistent diagnostics | Appends timestamped serial communication logs next to the EXE |
@@ -116,9 +117,10 @@ build\ActiveTAG-Configurator-vX.Y.Z.exe
 The build uses the static MSVC runtime (`/MT`), so the target machine does not
 need the Visual C++ Redistributable.
 
-The application icon and Windows version metadata are embedded directly into
-the EXE. `version.json` controls the window title, file metadata, EXE name, and
-portable ZIP naming.
+Dear ImGui `v1.92.8` is vendored in `third_party/imgui` and compiled into the
+EXE. The application icon and Windows version metadata are embedded directly
+into the EXE. `version.json` controls the window title, file metadata, EXE
+name, and portable ZIP naming.
 
 ## Test
 
@@ -149,8 +151,8 @@ The ZIP contains:
 - Portable usage instructions
 
 The executable depends only on protected Windows system components:
-`KERNEL32`, `USER32`, `GDI32`, `COMCTL32`, `COMDLG32`, `ADVAPI32`,
-`DWMAPI`, and `UXTHEME`.
+`KERNEL32`, `USER32`, `COMDLG32`, `ADVAPI32`, `D3D11`,
+`D3DCOMPILER_47`, `IMM32`, and `SHELL32`.
 These DLLs must not be copied between computers or registered with `regsvr32`.
 
 ## Project Layout
@@ -161,7 +163,7 @@ test/                Native parser tests
 deploy/              Portable dependency and Windows repair scripts
 docs/                Repository artwork
 tools/               Deterministic repository artwork generation
-third_party/         Vendored nlohmann/json single-header library
+third_party/         Vendored nlohmann/json and Dear ImGui source
 build.cmd            Release EXE build
 test.cmd             Native test build and execution
 package-portable.ps1 Portable ZIP generation

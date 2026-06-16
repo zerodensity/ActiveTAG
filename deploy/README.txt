@@ -11,10 +11,12 @@ ActiveTAG Configurator - Portable Windows Package
 Required DLLs:
   KERNEL32.dll
   USER32.dll
-  GDI32.dll
-  COMCTL32.dll
   COMDLG32.dll
   ADVAPI32.dll
+  D3D11.dll
+  IMM32.dll
+  D3DCOMPILER_47.dll
+  SHELL32.dll
 
 These are protected Windows system components. They are part of supported
 Windows installations and are not redistributable application DLLs.

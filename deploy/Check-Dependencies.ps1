@@ -8,10 +8,12 @@ $ErrorActionPreference = "Stop"
 $requiredDlls = @(
     "KERNEL32.dll",
     "USER32.dll",
-    "GDI32.dll",
-    "COMCTL32.dll",
     "COMDLG32.dll",
-    "ADVAPI32.dll"
+    "ADVAPI32.dll",
+    "D3D11.dll",
+    "D3DCOMPILER_47.dll",
+    "IMM32.dll",
+    "SHELL32.dll"
 )
 
 Write-Host "ActiveTAG Configurator dependency check" -ForegroundColor Cyan

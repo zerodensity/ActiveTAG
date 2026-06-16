@@ -20,11 +20,17 @@ execute_process(
 )
 
 add_executable(ActiveTAGConfigurator WIN32
-    src/main.cpp
+    src/main_imgui.cpp
     src/active_tag.cpp
     src/active_tag.hpp
     src/serial_port.cpp
     src/serial_port.hpp
+    third_party/imgui/imgui.cpp
+    third_party/imgui/imgui_draw.cpp
+    third_party/imgui/imgui_tables.cpp
+    third_party/imgui/imgui_widgets.cpp
+    third_party/imgui/backends/imgui_impl_win32.cpp
+    third_party/imgui/backends/imgui_impl_dx11.cpp
     src/generated/app.rc
 )
 
@@ -33,9 +39,12 @@ set_target_properties(ActiveTAGConfigurator PROPERTIES
 
 target_compile_features(ActiveTAGConfigurator PRIVATE cxx_std_20)
 target_compile_definitions(ActiveTAGConfigurator PRIVATE UNICODE _UNICODE NOMINMAX)
-target_include_directories(ActiveTAGConfigurator PRIVATE third_party)
+target_include_directories(ActiveTAGConfigurator PRIVATE
+    third_party
+    third_party/imgui
+    third_party/imgui/backends)
 target_link_libraries(ActiveTAGConfigurator PRIVATE
-    user32 gdi32 comctl32 comdlg32 advapi32)
+    user32 gdi32 comdlg32 advapi32 d3d11 dxgi imm32)
 
 if(MSVC)
     set_property(TARGET ActiveTAGConfigurator PROPERTY
