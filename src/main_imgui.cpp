@@ -1018,8 +1018,8 @@ void drawMainUi() {
     ImGui::EndChild();
     ImGui::PopStyleVar(3);
 
-    const float logWidth = 390.0f;
     const ImVec2 available = ImGui::GetContentRegionAvail();
+    const float logWidth = std::clamp(available.x * 0.56f, 500.0f, 640.0f);
     const float lowerHeight = available.y;
     ImGui::BeginChild(
         "Editor",
@@ -1056,14 +1056,14 @@ void drawMainUi() {
     ImGui::TextUnformatted("Serial Communication Log");
     ImGui::Separator();
     const float footerHeight = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y + 2.0f;
-    ImGui::BeginChild("LogLines", ImVec2(0, -footerHeight), false);
+    ImGui::BeginChild("LogLines", ImVec2(0, -footerHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
     std::vector<std::wstring> lines;
     {
         std::scoped_lock lock(g_app.mutex);
         lines = g_app.uiLog;
     }
     for (const auto& line : lines) {
-        ImGui::TextWrapped("%s", wideToUtf8(line).c_str());
+        ImGui::TextUnformatted(wideToUtf8(line).c_str());
     }
     if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 5.0f) {
         ImGui::SetScrollHereY(1.0f);
