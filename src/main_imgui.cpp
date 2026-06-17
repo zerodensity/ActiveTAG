@@ -22,6 +22,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -232,14 +233,18 @@ bool parseInteger(const std::string& input, long long& value) {
     }
 }
 
+bool isDisabledLedValue(long long value) {
+    return value == kLedDisabledWriteValue || value == kLedDisabledLegacyValue;
+}
+
 const char* productLabel(ProductType product) {
     switch (product) {
         case ProductType::TalentTrack:
-            return "Talent Track";
+            return "Talent Tracker";
         case ProductType::LensProfiling:
             return "Lens Profiling";
         default:
-            return "CAM";
+            return "Camera Tracker";
     }
 }
 
@@ -261,6 +266,16 @@ int productIndex(ProductType product) {
         return 2;
     }
     return 0;
+}
+
+int visibleLedCountForProduct(ProductType product) {
+    if (product == ProductType::TalentTrack) {
+        return 1;
+    }
+    if (product == ProductType::LensProfiling) {
+        return 4;
+    }
+    return 8;
 }
 
 std::vector<std::string> profileNames(ProductType product) {
@@ -518,8 +533,51 @@ void writeConfigToTag() {
     g_app.busy = false;
 }
 
+std::optional<std::string> customProfileConflictMessage() {
+    if (g_app.selectedProfile != 0) {
+        return std::nullopt;
+    }
+
+    const auto uplinkIt = g_app.values.find("2");
+    if (uplinkIt != g_app.values.end() && uplinkIt->second >= 0 && uplinkIt->second <= 20) {
+        return "This ID is in use!\n\nUplink ID " + std::to_string(uplinkIt->second) +
+            " is reserved by the known Label Group list.";
+    }
+
+    std::set<long long> knownActiveLedIds;
+    for (const auto& group : activetag::ActiveTag::labelGroups()) {
+        for (const long long id : group) {
+            if (!isDisabledLedValue(id)) {
+                knownActiveLedIds.insert(id);
+            }
+        }
+    }
+    for (const auto& group : activetag::ActiveTag::talentTrackGroups()) {
+        for (const long long id : group) {
+            if (!isDisabledLedValue(id)) {
+                knownActiveLedIds.insert(id);
+            }
+        }
+    }
+
+    for (int led = 0; led < visibleLedCountForProduct(g_app.product); ++led) {
+        const auto valueIt = g_app.values.find("D" + std::to_string(led));
+        if (valueIt != g_app.values.end() && knownActiveLedIds.contains(valueIt->second)) {
+            return "This ID is in use!\n\nLED " + std::to_string(led) +
+                " Active ID " + formatHex(valueIt->second) +
+                " is already reserved by a known profile.";
+        }
+    }
+
+    return std::nullopt;
+}
+
 void confirmSaveToTag() {
     if (!g_app.connected) {
+        return;
+    }
+    if (const auto conflict = customProfileConflictMessage()) {
+        showDialog(DialogKind::Error, "This ID is in use!", *conflict);
         return;
     }
     showDialog(
@@ -636,7 +694,7 @@ LRESULT WINAPI windowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 void drawProductSelector() {
     ImGui::TextUnformatted("Product");
-    const char* labels[] = {"CAM", "Talent Track", "Lens Profiling"};
+    const char* labels[] = {"Camera Tracker", "Talent Tracker", "Lens Profiling"};
     const int current = productIndex(g_app.product);
     const float available = ImGui::GetContentRegionAvail().x;
     const float buttonWidth = std::clamp((available - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f,
@@ -723,7 +781,7 @@ void drawLedField(int led) {
         ImGui::EndDisabled();
     }
     ImGui::TextDisabled(
-        (value == kLedDisabledWriteValue || value == kLedDisabledLegacyValue)
+        isDisabledLedValue(value)
             ? "Decimal: %lld  (Disabled)"
             : "Decimal: %lld",
         value);
@@ -744,13 +802,7 @@ void drawSectionHeader(const char* label) {
 }
 
 int visibleLedCount() {
-    if (g_app.product == ProductType::TalentTrack) {
-        return 1;
-    }
-    if (g_app.product == ProductType::LensProfiling) {
-        return 4;
-    }
-    return 8;
+    return visibleLedCountForProduct(g_app.product);
 }
 
 void drawModalDialog() {
