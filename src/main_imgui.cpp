@@ -144,6 +144,29 @@ std::wstring timestampLines(const std::wstring& text) {
     return output;
 }
 
+std::wstring logTextForUi(const std::wstring& text) {
+    std::wstring normalized = text;
+    std::replace(normalized.begin(), normalized.end(), L'\r', L'\n');
+
+    std::wstringstream input(normalized);
+    std::wstring line;
+    std::wstring output;
+    while (std::getline(input, line, L'\n')) {
+        const std::wstring labelGroupToken = L"labelGroupId";
+        if (line.find(L"[-]") != std::wstring::npos) {
+            const std::size_t position = line.find(labelGroupToken);
+            if (position != std::wstring::npos) {
+                line.replace(
+                    position,
+                    labelGroupToken.size(),
+                    L"firmwareLabelGroupId (read-only)");
+            }
+        }
+        output += line + L"\n";
+    }
+    return output;
+}
+
 bool openLogFile() {
     wchar_t executablePath[MAX_PATH]{};
     const DWORD length = GetModuleFileNameW(nullptr, executablePath, MAX_PATH);
@@ -157,13 +180,14 @@ bool openLogFile() {
 }
 
 void appendLog(const std::wstring& text) {
-    const std::wstring lines = timestampLines(text);
-    if (lines.empty()) {
+    const std::wstring fileLines = timestampLines(text);
+    const std::wstring uiLines = timestampLines(logTextForUi(text));
+    if (fileLines.empty()) {
         return;
     }
     {
         std::scoped_lock lock(g_app.mutex);
-        std::wstringstream input(lines);
+        std::wstringstream input(uiLines);
         std::wstring line;
         while (std::getline(input, line, L'\n')) {
             if (!line.empty()) {
@@ -175,7 +199,7 @@ void appendLog(const std::wstring& text) {
         }
     }
     if (g_app.logFile.is_open()) {
-        g_app.logFile << wideToUtf8(lines);
+        g_app.logFile << wideToUtf8(fileLines);
         g_app.logFile.flush();
     }
 }
