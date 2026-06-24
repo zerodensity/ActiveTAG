@@ -379,11 +379,64 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
     }
 }
 
+void clearDeviceState() {
+    g_app.snapshot = {};
+    g_app.values.clear();
+    g_app.ledFieldsLocked = false;
+    g_app.selectedProfile = 0;
+}
+
 void refreshPorts() {
     g_app.ports = activetag::SerialPort::enumerate();
     if (g_app.selectedPort.empty() && !g_app.ports.empty()) {
         g_app.selectedPort = g_app.ports.front().path;
     }
+}
+
+bool portExists(const std::wstring& path) {
+    return std::any_of(g_app.ports.begin(), g_app.ports.end(), [&](const activetag::PortInfo& port) {
+        return port.path == path;
+    });
+}
+
+void startAutoProbe();
+
+void disconnectCurrentTag(const std::wstring& reason) {
+    const std::wstring port = g_app.tag.portPath().empty()
+        ? g_app.selectedPort
+        : g_app.tag.portPath();
+    g_app.tag.disconnect();
+    g_app.connected = false;
+    clearDeviceState();
+    if (!reason.empty()) {
+        appendLog(reason + (port.empty() ? L"" : L" (" + port + L")") + L"\n");
+    }
+}
+
+void handleSerialFailure() {
+    if (!g_app.connected || g_app.tag.isConnected()) {
+        return;
+    }
+    disconnectCurrentTag(L"Active Tag serial connection was lost");
+    refreshPorts();
+    startAutoProbe();
+}
+
+void watchConnectedPort() {
+    if (!g_app.connected || g_app.busy) {
+        return;
+    }
+
+    const std::wstring connectedPort = g_app.tag.portPath();
+    refreshPorts();
+    if (!connectedPort.empty() && portExists(connectedPort)) {
+        return;
+    }
+
+    g_app.selectedPort.clear();
+    disconnectCurrentTag(L"Connected COM port was removed; Active Tag disconnected");
+    refreshPorts();
+    startAutoProbe();
 }
 
 void startAutoProbe() {
@@ -548,6 +601,7 @@ void writeConfigToTag() {
         showDialog(DialogKind::Info, "Config Saved", "Config saved and verified.");
     } catch (const std::exception& error) {
         appendLog(L"\nERROR: " + utf8ToWide(error.what()) + L"\n");
+        handleSerialFailure();
         showErrorDialog(error);
     }
     g_app.busy = false;
@@ -1017,9 +1071,7 @@ void drawMainUi() {
             connectPort(g_app.selectedPort);
         }
     } else if (ImGui::Button("Disconnect", ImVec2(connectButtonWidth, 32))) {
-        g_app.tag.disconnect();
-        g_app.connected = false;
-        appendLog(L"Disconnected.\n");
+        disconnectCurrentTag(L"Disconnected.");
     }
     drawProductSelector();
     drawProfileCombo();
@@ -1041,6 +1093,8 @@ void drawMainUi() {
             renderSnapshot(g_app.tag.read());
         } catch (const std::exception& error) {
             appendLog(L"\nERROR: " + utf8ToWide(error.what()) + L"\n");
+            handleSerialFailure();
+            showErrorDialog(error);
         }
     }
     ImGui::SameLine();
@@ -1192,6 +1246,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         }
         if (done) {
             break;
+        }
+
+        if (g_app.connected && !g_app.busy) {
+            static DWORD lastPortWatch = 0;
+            const DWORD now = GetTickCount();
+            if (now - lastPortWatch > 1000) {
+                watchConnectedPort();
+                lastPortWatch = now;
+            }
         }
 
         if (g_app.shouldConnectDetected.exchange(false)) {

@@ -171,7 +171,9 @@ std::string SerialPort::command(const std::string& value, DWORD timeoutMs) {
     while (std::chrono::steady_clock::now() < deadline) {
         DWORD bytesRead = 0;
         if (!ReadFile(handle_, buffer, sizeof(buffer), &bytesRead, nullptr)) {
-            throw std::runtime_error(windowsError("Reading serial response"));
+            const DWORD error = GetLastError();
+            close();
+            throw std::runtime_error(windowsErrorCode("Reading serial response", error));
         }
         if (bytesRead > 0) {
             response.append(buffer, bytesRead);
@@ -185,6 +187,7 @@ std::string SerialPort::command(const std::string& value, DWORD timeoutMs) {
         }
     }
 
+    close();
     throw std::runtime_error("Serial command timed out: " + value);
 }
 
