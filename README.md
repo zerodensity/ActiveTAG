@@ -35,7 +35,7 @@ computer.
 | Manual override | Edits Uplink ID in Custom mode, RF Channel, Signal Intensity, LED Brightness, charging behavior and Custom LED IDs |
 | Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
 | Product selector | Separates Camera Tracker, Talent Tracker, and Lens Profiling profile families |
-| Talent Tracker | Applies Label Group 6-20 profiles with only LED 3 active |
+| Talent Tracker | Applies Label Group 6-20 profiles with only LED 7 active |
 | Lens Profiling | Applies Profile TAG 1-2 / Label Group 21-22 with LEDs 0-3 active and LEDs 4-7 disabled |
 | Automatic profile selection | Opens the matching Camera Tracker, Talent Tracker, or Lens Profiling product after reading the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |

@@ -270,7 +270,7 @@ int productIndex(ProductType product) {
 
 std::vector<int> visibleLedIndicesForProduct(ProductType product) {
     if (product == ProductType::TalentTrack) {
-        return {3};
+        return {7};
     }
     if (product == ProductType::LensProfiling) {
         return {0, 1, 2, 3};

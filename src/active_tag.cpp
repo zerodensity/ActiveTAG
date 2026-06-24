@@ -290,21 +290,21 @@ const std::array<std::array<long long, 8>, 6>& ActiveTag::labelGroups() {
 const std::array<std::array<long long, 8>, 15>& ActiveTag::talentTrackGroups() {
     constexpr long long disabled = disabledLedWriteValue;
     static const std::array<std::array<long long, 8>, 15> groups = {{
-        {{disabled, disabled, disabled, 0x804, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x50, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x2008, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x424, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x908, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x2110, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x248, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x920, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x2090, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x228, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0xA08, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x2088, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x128, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0xA04, disabled, disabled, disabled, disabled}},
-        {{disabled, disabled, disabled, 0x2048, disabled, disabled, disabled, disabled}}
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x804}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x50}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x2008}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x424}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x908}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x2110}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x248}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x920}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x2090}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x228}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0xA08}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x2088}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x128}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0xA04}},
+        {{disabled, disabled, disabled, disabled, disabled, disabled, disabled, 0x2048}}
     }};
     return groups;
 }
