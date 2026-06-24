@@ -67,6 +67,10 @@ bool ActiveTag::isConnected() const {
     return serial_.isOpen();
 }
 
+bool ActiveTag::isResponsive() {
+    return serial_.probe("d", 1000);
+}
+
 const std::wstring& ActiveTag::portPath() const {
     return serial_.path();
 }

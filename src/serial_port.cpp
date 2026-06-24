@@ -191,6 +191,19 @@ std::string SerialPort::command(const std::string& value, DWORD timeoutMs) {
     throw std::runtime_error("Serial command timed out: " + value);
 }
 
+bool SerialPort::probe(const std::string& value, DWORD timeoutMs) {
+    auto callback = std::move(logCallback_);
+    logCallback_ = {};
+    try {
+        command(value, timeoutMs);
+        logCallback_ = std::move(callback);
+        return true;
+    } catch (...) {
+        logCallback_ = std::move(callback);
+        return false;
+    }
+}
+
 void SerialPort::setLogCallback(std::function<void(const std::string&)> callback) {
     logCallback_ = std::move(callback);
 }

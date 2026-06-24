@@ -27,6 +27,7 @@ public:
     [[nodiscard]] const std::wstring& path() const;
 
     std::string command(const std::string& command, DWORD timeoutMs = 4000);
+    bool probe(const std::string& command, DWORD timeoutMs = 1000);
     void setLogCallback(std::function<void(const std::string&)> callback);
 
     static std::vector<PortInfo> enumerate();

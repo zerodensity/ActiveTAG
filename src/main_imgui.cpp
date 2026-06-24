@@ -429,12 +429,12 @@ void watchConnectedPort() {
 
     const std::wstring connectedPort = g_app.tag.portPath();
     refreshPorts();
-    if (!connectedPort.empty() && portExists(connectedPort)) {
+    if (!connectedPort.empty() && portExists(connectedPort) && g_app.tag.isResponsive()) {
         return;
     }
 
     g_app.selectedPort.clear();
-    disconnectCurrentTag(L"Connected COM port was removed; Active Tag disconnected");
+    disconnectCurrentTag(L"Connected Active Tag stopped responding; disconnected");
     refreshPorts();
     startAutoProbe();
 }

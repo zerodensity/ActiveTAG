@@ -41,6 +41,7 @@ public:
     void connect(const std::wstring& portPath);
     void disconnect();
     [[nodiscard]] bool isConnected() const;
+    [[nodiscard]] bool isResponsive();
     [[nodiscard]] const std::wstring& portPath() const;
 
     Snapshot read();
