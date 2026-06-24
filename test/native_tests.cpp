@@ -23,7 +23,7 @@ std::string talentTrackDump(int group, const std::array<long long, 8>& leds) {
 }
 
 std::string lensProfileDump(int profileIndex, const std::array<long long, 8>& leds) {
-    const int uplink = profileIndex + 19;
+    const int uplink = profileIndex + 21;
     std::ostringstream dump;
     dump << "FIRMWARE VERSION    : 2.3.4 (compiled May  8 2023 15:29:25)\n"
          << "[-]  serialNum      : 32501\n"
@@ -150,6 +150,11 @@ int main() {
     }
 
     const auto& lensProfiles = activetag::ActiveTag::lensProfiles();
+    if (lensProfiles[0][0] != 0x54 || lensProfiles[0][3] != 0x2A0 ||
+        lensProfiles[1][0] != 0xA02 || lensProfiles[1][3] != 0x492) {
+        std::cerr << "Lens Profiling fixed LED IDs do not match the captured profiles.\n";
+        return 1;
+    }
     for (int index = 0; index < static_cast<int>(lensProfiles.size()); ++index) {
         const auto snapshot =
             activetag::ActiveTag::parseDump(lensProfileDump(index, lensProfiles[index]));

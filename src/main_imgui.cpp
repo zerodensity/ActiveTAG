@@ -308,7 +308,7 @@ std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
     }
     if (snapshot.detectedLensProfile) {
         return L"Profile TAG " + std::to_wstring(*snapshot.detectedLensProfile + 1) +
-            L" / Label Group " + std::to_wstring(*snapshot.detectedLensProfile + 19);
+            L" / Label Group " + std::to_wstring(*snapshot.detectedLensProfile + 21);
     }
     return L"Custom";
 }
@@ -342,7 +342,7 @@ void applyProfile(int selectedProfile) {
         setValue("4", 20);
         setValue("5", 1);
     } else if (g_app.product == ProductType::LensProfiling && selectedProfile <= 2) {
-        uplink = selectedProfile + 18;
+        uplink = selectedProfile + 20;
         leds = &activetag::ActiveTag::lensProfiles()[selectedProfile - 1];
         setValue("3", 20);
         setValue("4", 20);
@@ -564,7 +564,7 @@ std::optional<std::string> customProfileConflictMessage() {
     }
 
     const auto uplinkIt = g_app.values.find("2");
-    if (uplinkIt != g_app.values.end() && uplinkIt->second >= 0 && uplinkIt->second <= 20) {
+    if (uplinkIt != g_app.values.end() && uplinkIt->second >= 0 && uplinkIt->second <= 22) {
         return "This ID is in use!\n\nUplink ID " + std::to_string(uplinkIt->second) +
             " is reserved by the known Label Group list.";
     }
@@ -781,6 +781,15 @@ void drawNumberField(const char* label, const std::string& id) {
     if (ImGui::InputInt(("##" + id).c_str(), &value, 0, 0)) {
         g_app.values[id] = std::max(0, value);
     }
+}
+
+void drawReadOnlyNumberField(const char* label, long long value) {
+    ImGui::TextUnformatted(label);
+    ImGui::BeginDisabled();
+    int displayValue = static_cast<int>(value);
+    ImGui::SetNextItemWidth(std::min(190.0f, ImGui::GetContentRegionAvail().x));
+    ImGui::InputInt(("##readonly-" + std::string(label)).c_str(), &displayValue, 0, 0);
+    ImGui::EndDisabled();
 }
 
 void drawLedField(int led) {
@@ -1071,7 +1080,13 @@ void drawMainUi() {
     drawSectionHeader("General Settings");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
-    drawNumberField("Uplink ID / Label Group", "2");
+    drawNumberField("Uplink ID", "2");
+    if (g_app.product == ProductType::LensProfiling) {
+        const auto labelGroupIt = g_app.values.find("2");
+        drawReadOnlyNumberField(
+            "Label Group",
+            labelGroupIt == g_app.values.end() ? 0 : labelGroupIt->second);
+    }
     drawNumberField("RF Channel", "3");
     if (g_app.product == ProductType::LensProfiling) {
         drawNumberField("Signal Intensity", "6");

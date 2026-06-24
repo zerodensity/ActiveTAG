@@ -249,7 +249,7 @@ std::optional<int> ActiveTag::detectLensProfile(const Snapshot& snapshot) {
     }
 
     for (int index = 0; index < static_cast<int>(lensProfiles().size()); ++index) {
-        const int expectedUplink = index + 19;
+        const int expectedUplink = index + 21;
         if (uplinkIt->second.numericValue != expectedUplink) {
             continue;
         }
@@ -308,8 +308,8 @@ const std::array<std::array<long long, 8>, 15>& ActiveTag::talentTrackGroups() {
 const std::array<std::array<long long, 8>, 2>& ActiveTag::lensProfiles() {
     constexpr long long disabled = disabledLedWriteValue;
     static const std::array<std::array<long long, 8>, 2> profiles = {{
-        {{0x281, 0x290, 0x409, 0x40A, disabled, disabled, disabled, disabled}},
-        {{0x812, 0x814, 0x902, 0x940, disabled, disabled, disabled, disabled}}
+        {{0x54, 0xA8, 0x150, 0x2A0, disabled, disabled, disabled, disabled}},
+        {{0xA02, 0xA80, 0x249, 0x492, disabled, disabled, disabled, disabled}}
     }};
     return profiles;
 }
