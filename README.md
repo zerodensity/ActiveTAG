@@ -32,7 +32,7 @@ computer.
 | Device inspection | Reads serial number, firmware, hardware revision, RF settings and LED IDs |
 | Config export | Saves a versioned `activetag-config/v1` JSON file |
 | Config import | Loads supported values into the editor before writing |
-| Manual override | Edits Uplink ID, RF Channel, LED Brightness, charging behavior and Custom LED IDs |
+| Manual override | Edits Uplink ID in Custom mode, RF Channel, Signal Intensity, LED Brightness, charging behavior and Custom LED IDs |
 | Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
 | Product selector | Separates Camera Tracker, Talent Tracker, and Lens Profiling profile families |
 | Talent Tracker | Applies Label Group 6-20 profiles with only LED 4 active |
@@ -54,7 +54,7 @@ The firmware 2.x configuration surface currently exposed by the application:
 |---|---|
 | `[2]` | Uplink ID |
 | `[3]` | RF Channel |
-| `[6]` | Signal Intensity, editable for Lens Profiling profiles |
+| `[6]` | Signal Intensity |
 | `[4]` | LED Brightness |
 | `[5]` | On While Charging |
 | `[D0]` - `[D7]` | Active marker LED IDs |

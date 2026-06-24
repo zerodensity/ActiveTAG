@@ -528,14 +528,9 @@ void importConfig() {
 
 std::map<std::string, long long> collectValues() {
     std::map<std::string, long long> values;
-    for (const auto& id : {"2", "3", "4", "5", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}) {
+    for (const auto& id : {"2", "3", "4", "5", "6", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}) {
         if (const auto it = g_app.values.find(id); it != g_app.values.end()) {
             values[id] = it->second;
-        }
-    }
-    if (g_app.product == ProductType::LensProfiling) {
-        if (const auto it = g_app.values.find("6"); it != g_app.values.end()) {
-            values["6"] = it->second;
         }
     }
     return values;
@@ -774,12 +769,18 @@ void drawProfileCombo() {
     }
 }
 
-void drawNumberField(const char* label, const std::string& id) {
+void drawNumberField(const char* label, const std::string& id, bool editable = true) {
     int value = static_cast<int>(g_app.values[id]);
     ImGui::TextUnformatted(label);
+    if (!editable) {
+        ImGui::BeginDisabled();
+    }
     ImGui::SetNextItemWidth(std::min(190.0f, ImGui::GetContentRegionAvail().x));
     if (ImGui::InputInt(("##" + id).c_str(), &value, 0, 0)) {
         g_app.values[id] = std::max(0, value);
+    }
+    if (!editable) {
+        ImGui::EndDisabled();
     }
 }
 
@@ -1080,17 +1081,13 @@ void drawMainUi() {
     drawSectionHeader("General Settings");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
-    drawNumberField("Uplink ID", "2");
-    if (g_app.product == ProductType::LensProfiling) {
-        const auto labelGroupIt = g_app.values.find("2");
-        drawReadOnlyNumberField(
-            "Label Group",
-            labelGroupIt == g_app.values.end() ? 0 : labelGroupIt->second);
-    }
+    drawNumberField("Uplink ID", "2", g_app.selectedProfile == 0);
+    const auto labelGroupIt = g_app.values.find("2");
+    drawReadOnlyNumberField(
+        "Label Group",
+        labelGroupIt == g_app.values.end() ? 0 : labelGroupIt->second);
     drawNumberField("RF Channel", "3");
-    if (g_app.product == ProductType::LensProfiling) {
-        drawNumberField("Signal Intensity", "6");
-    }
+    drawNumberField("Signal Intensity", "6");
     drawNumberField("LED Brightness", "4");
     drawNumberField("On While Charging", "5");
     ImGui::PopStyleVar(2);
