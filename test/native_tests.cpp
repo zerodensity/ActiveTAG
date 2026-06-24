@@ -22,6 +22,24 @@ std::string talentTrackDump(int group, const std::array<long long, 8>& leds) {
     return dump.str();
 }
 
+std::string lensProfileDump(int profileIndex, const std::array<long long, 8>& leds) {
+    const int uplink = profileIndex + 19;
+    std::ostringstream dump;
+    dump << "FIRMWARE VERSION    : 2.3.4 (compiled May  8 2023 15:29:25)\n"
+         << "[-]  serialNum      : 32501\n"
+         << "[-]  hardwareRev    : G\n"
+         << "[2]  uplinkId       : " << uplink << "\n"
+         << "[3]  rfChannel      : 20\n"
+         << "[6]  signalIntensity: 1\n"
+         << "[4]  ledBrightness  : 20\n"
+         << "[5]  onWhileCharging: 1\n";
+    for (int led = 0; led < 8; ++led) {
+        dump << "[D" << led << "] led" << led << "Id : "
+             << leds[led] << "\n";
+    }
+    return dump.str();
+}
+
 int main() {
     std::ifstream input("Active Putty Output.txt", std::ios::binary);
     if (!input) {
@@ -61,6 +79,10 @@ int main() {
             std::cerr << "Camera dump " << index << " was misidentified as Talent Track.\n";
             return 1;
         }
+        if (snapshot.detectedLensProfile) {
+            std::cerr << "Camera dump " << index << " was misidentified as Lens Profiling.\n";
+            return 1;
+        }
         if (snapshot.fields.at("1").supported) {
             std::cerr << "Unsupported field [1] was treated as writable.\n";
             return 1;
@@ -83,6 +105,11 @@ int main() {
         }
         if (snapshot.detectedLabelGroup) {
             std::cerr << "Talent Track group " << group << " was misidentified as CAM.\n";
+            return 1;
+        }
+        if (snapshot.detectedLensProfile) {
+            std::cerr << "Talent Track group " << group
+                      << " was misidentified as Lens Profiling.\n";
             return 1;
         }
         for (int led = 0; led < 8; ++led) {
@@ -118,6 +145,52 @@ int main() {
             *legacySnapshot.detectedTalentTrackGroup != group) {
             std::cerr << "Legacy disabled Talent Track mismatch for Label Group "
                       << group << ".\n";
+            return 1;
+        }
+    }
+
+    const auto& lensProfiles = activetag::ActiveTag::lensProfiles();
+    for (int index = 0; index < static_cast<int>(lensProfiles.size()); ++index) {
+        const auto snapshot =
+            activetag::ActiveTag::parseDump(lensProfileDump(index, lensProfiles[index]));
+        if (!snapshot.detectedLensProfile || *snapshot.detectedLensProfile != index) {
+            std::cerr << "Lens Profiling mismatch for Profile TAG "
+                      << (index + 1) << ".\n";
+            return 1;
+        }
+        if (snapshot.detectedLabelGroup) {
+            std::cerr << "Lens Profile TAG " << (index + 1)
+                      << " was misidentified as CAM.\n";
+            return 1;
+        }
+        if (snapshot.detectedTalentTrackGroup) {
+            std::cerr << "Lens Profile TAG " << (index + 1)
+                      << " was misidentified as Talent Track.\n";
+            return 1;
+        }
+        for (int led = 0; led < 8; ++led) {
+            const long long value = snapshot.fields.at("D" + std::to_string(led)).numericValue;
+            if (value != lensProfiles[index][led]) {
+                std::cerr << "Lens Profile TAG " << (index + 1)
+                          << " LED " << led << " mismatch.\n";
+                return 1;
+            }
+            if (led >= 4 && value != 0xFFFFFFFFLL) {
+                std::cerr << "Lens Profile TAG " << (index + 1)
+                          << " disabled LED mismatch.\n";
+                return 1;
+            }
+        }
+
+        auto legacyDisabled = lensProfiles[index];
+        for (int led = 4; led < 8; ++led) {
+            legacyDisabled[led] = 0x7FFFFFFFLL;
+        }
+        const auto legacySnapshot =
+            activetag::ActiveTag::parseDump(lensProfileDump(index, legacyDisabled));
+        if (!legacySnapshot.detectedLensProfile || *legacySnapshot.detectedLensProfile != index) {
+            std::cerr << "Legacy disabled Lens Profile TAG " << (index + 1)
+                      << " mismatch.\n";
             return 1;
         }
     }

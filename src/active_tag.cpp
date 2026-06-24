@@ -12,7 +12,7 @@ namespace activetag {
 namespace {
 
 const std::set<std::string> documentedFirmware2Fields = {
-    "2", "3", "4", "5", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"};
+    "2", "3", "4", "5", "6", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"};
 
 constexpr long long disabledLedWriteValue = 0xFFFFFFFFLL;
 constexpr long long disabledLedLegacyValue = 0x7FFFFFFFLL;
@@ -183,6 +183,7 @@ Snapshot ActiveTag::parseDump(const std::string& raw) {
 
     snapshot.detectedLabelGroup = detectLabelGroup(snapshot);
     snapshot.detectedTalentTrackGroup = detectTalentTrackGroup(snapshot);
+    snapshot.detectedLensProfile = detectLensProfile(snapshot);
     return snapshot;
 }
 
@@ -241,6 +242,35 @@ std::optional<int> ActiveTag::detectTalentTrackGroup(const Snapshot& snapshot) {
     return std::nullopt;
 }
 
+std::optional<int> ActiveTag::detectLensProfile(const Snapshot& snapshot) {
+    const auto uplinkIt = snapshot.fields.find("2");
+    if (uplinkIt == snapshot.fields.end() || !uplinkIt->second.hasNumericValue) {
+        return std::nullopt;
+    }
+
+    for (int index = 0; index < static_cast<int>(lensProfiles().size()); ++index) {
+        const int expectedUplink = index + 19;
+        if (uplinkIt->second.numericValue != expectedUplink) {
+            continue;
+        }
+
+        bool matches = true;
+        for (int led = 0; led < 8; ++led) {
+            const auto fieldIt = snapshot.fields.find("D" + std::to_string(led));
+            if (fieldIt == snapshot.fields.end() ||
+                !fieldIt->second.hasNumericValue ||
+                !fieldMatchesExpectedLed(fieldIt->second.numericValue, lensProfiles()[index][led])) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
 const std::array<std::array<long long, 8>, 6>& ActiveTag::labelGroups() {
     static const std::array<std::array<long long, 8>, 6> groups = {{
         {{1, 2, 4, 8, 16, 32, 64, 128}},
@@ -273,6 +303,15 @@ const std::array<std::array<long long, 8>, 15>& ActiveTag::talentTrackGroups() {
         {{disabled, disabled, disabled, disabled, 0x2048, disabled, disabled, disabled}}
     }};
     return groups;
+}
+
+const std::array<std::array<long long, 8>, 2>& ActiveTag::lensProfiles() {
+    constexpr long long disabled = disabledLedWriteValue;
+    static const std::array<std::array<long long, 8>, 2> profiles = {{
+        {{0x281, 0x290, 0x409, 0x40A, disabled, disabled, disabled, disabled}},
+        {{0x812, 0x814, 0x902, 0x940, disabled, disabled, disabled, disabled}}
+    }};
+    return profiles;
 }
 
 }  // namespace activetag

@@ -290,6 +290,9 @@ std::vector<std::string> profileNames(ProductType product) {
             names.push_back("Talent Tracker " + std::to_string(group - 5) +
                 " - Label Group " + std::to_string(group));
         }
+    } else if (product == ProductType::LensProfiling) {
+        names.push_back("Profile TAG 1");
+        names.push_back("Profile TAG 2");
     }
     return names;
 }
@@ -302,6 +305,10 @@ std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
     if (snapshot.detectedTalentTrackGroup) {
         return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedTalentTrackGroup);
+    }
+    if (snapshot.detectedLensProfile) {
+        return L"Profile TAG " + std::to_wstring(*snapshot.detectedLensProfile + 1) +
+            L" / Label Group " + std::to_wstring(*snapshot.detectedLensProfile + 19);
     }
     return L"Custom";
 }
@@ -334,6 +341,13 @@ void applyProfile(int selectedProfile) {
         setValue("3", 20);
         setValue("4", 20);
         setValue("5", 1);
+    } else if (g_app.product == ProductType::LensProfiling && selectedProfile <= 2) {
+        uplink = selectedProfile + 18;
+        leds = &activetag::ActiveTag::lensProfiles()[selectedProfile - 1];
+        setValue("3", 20);
+        setValue("4", 20);
+        setValue("5", 1);
+        setValue("6", 1);
     } else {
         g_app.ledFieldsLocked = false;
         return;
@@ -358,6 +372,8 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
         selectProduct(ProductType::Camera, *snapshot.detectedLabelGroup + 1, true);
     } else if (snapshot.detectedTalentTrackGroup) {
         selectProduct(ProductType::TalentTrack, *snapshot.detectedTalentTrackGroup - 5, true);
+    } else if (snapshot.detectedLensProfile) {
+        selectProduct(ProductType::LensProfiling, *snapshot.detectedLensProfile + 1, true);
     } else {
         selectProduct(g_app.product, 0, false);
     }
@@ -459,6 +475,8 @@ json snapshotToJson(const activetag::Snapshot& snapshot) {
                 ? json(*snapshot.detectedLabelGroup) : json(nullptr)},
             {"detectedTalentTrackGroup", snapshot.detectedTalentTrackGroup
                 ? json(*snapshot.detectedTalentTrackGroup) : json(nullptr)},
+            {"detectedLensProfile", snapshot.detectedLensProfile
+                ? json(*snapshot.detectedLensProfile) : json(nullptr)},
             {"fields", fields}
         }},
         {"source", {
@@ -494,7 +512,7 @@ void importConfig() {
             throw std::runtime_error("Unsupported config schema.");
         }
         const auto& fields = value.at("configuration").at("fields");
-        for (const auto& id : {"2", "3", "4", "5", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}) {
+        for (const auto& id : {"2", "3", "4", "5", "6", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}) {
             if (fields.contains(id) && fields.at(id).is_number_integer()) {
                 g_app.values[id] = fields.at(id).get<long long>();
             }
@@ -511,7 +529,14 @@ void importConfig() {
 std::map<std::string, long long> collectValues() {
     std::map<std::string, long long> values;
     for (const auto& id : {"2", "3", "4", "5", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}) {
-        values[id] = g_app.values[id];
+        if (const auto it = g_app.values.find(id); it != g_app.values.end()) {
+            values[id] = it->second;
+        }
+    }
+    if (g_app.product == ProductType::LensProfiling) {
+        if (const auto it = g_app.values.find("6"); it != g_app.values.end()) {
+            values["6"] = it->second;
+        }
     }
     return values;
 }
@@ -554,6 +579,13 @@ std::optional<std::string> customProfileConflictMessage() {
     }
     for (const auto& group : activetag::ActiveTag::talentTrackGroups()) {
         for (const long long id : group) {
+            if (!isDisabledLedValue(id)) {
+                knownActiveLedIds.insert(id);
+            }
+        }
+    }
+    for (const auto& profile : activetag::ActiveTag::lensProfiles()) {
+        for (const long long id : profile) {
             if (!isDisabledLedValue(id)) {
                 knownActiveLedIds.insert(id);
             }
@@ -1039,8 +1071,11 @@ void drawMainUi() {
     drawSectionHeader("General Settings");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
-    drawNumberField("Uplink ID", "2");
+    drawNumberField("Uplink ID / Label Group", "2");
     drawNumberField("RF Channel", "3");
+    if (g_app.product == ProductType::LensProfiling) {
+        drawNumberField("Signal Intensity", "6");
+    }
     drawNumberField("LED Brightness", "4");
     drawNumberField("On While Charging", "5");
     ImGui::PopStyleVar(2);

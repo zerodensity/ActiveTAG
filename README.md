@@ -36,7 +36,8 @@ computer.
 | Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
 | Product selector | Separates Camera Tracker, Talent Tracker, and Lens Profiling profile families |
 | Talent Tracker | Applies Label Group 6-20 profiles with only LED 4 active |
-| Automatic profile selection | Opens the Camera Tracker or Talent Tracker product after matching the connected device |
+| Lens Profiling | Applies Profile TAG 1-2 with LEDs 0-3 active and LEDs 4-7 disabled |
+| Automatic profile selection | Opens the matching Camera Tracker, Talent Tracker, or Lens Profiling product after reading the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
 | Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
 | Native modal flow | Confirmation, success, and runtime error dialogs use the same ImGui interface |
@@ -53,12 +54,12 @@ The firmware 2.x configuration surface currently exposed by the application:
 |---|---|
 | `[2]` | Uplink ID |
 | `[3]` | RF Channel |
+| `[6]` | Signal Intensity, editable for Lens Profiling profiles |
 | `[4]` | LED Brightness |
 | `[5]` | On While Charging |
 | `[D0]` - `[D7]` | Active marker LED IDs |
 
 Fields reported as `[-]` are read-only. `[1] (unsupported)` is never written.
-Signal Intensity is intentionally excluded from the editor and config files.
 Disabled LED IDs are written as `0xFFFFFFFF` (`4294967295`). The parser still
 recognizes older `0x7FFFFFFF` (`2147483647`) dumps as disabled so previously
 written tags can be detected safely.

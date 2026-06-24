@@ -27,6 +27,7 @@ struct Snapshot {
     std::map<std::string, ConfigField> fields;
     std::optional<int> detectedLabelGroup;
     std::optional<int> detectedTalentTrackGroup;
+    std::optional<int> detectedLensProfile;
 };
 
 struct Change {
@@ -51,8 +52,10 @@ public:
     static bool isActiveTag(const Snapshot& snapshot);
     static std::optional<int> detectLabelGroup(const Snapshot& snapshot);
     static std::optional<int> detectTalentTrackGroup(const Snapshot& snapshot);
+    static std::optional<int> detectLensProfile(const Snapshot& snapshot);
     static const std::array<std::array<long long, 8>, 6>& labelGroups();
     static const std::array<std::array<long long, 8>, 15>& talentTrackGroups();
+    static const std::array<std::array<long long, 8>, 2>& lensProfiles();
 
 private:
     SerialPort serial_;
