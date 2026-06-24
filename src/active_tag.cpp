@@ -106,6 +106,11 @@ std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
             if (target < 0 || target > 255) {
                 throw std::runtime_error("Label Group must be between 0 and 255.");
             }
+            if (target < 2) {
+                // Active Batch Programmer and firmware leave labelGroupId unchanged for
+                // groups 0 and 1 even though uplinkId and LED labels are writable.
+                continue;
+            }
             if (!beforeLabelGroup || *beforeLabelGroup != target) {
                 changes.push_back({requestedLabelGroupField, beforeLabelGroup.value_or(-1), target});
             }

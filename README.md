@@ -40,7 +40,7 @@ computer.
 | Automatic profile selection | Opens the matching Camera Tracker, Talent Tracker, or Lens Profiling product after reading the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
 | Label Group display | Shows the selected profile Label Group alongside the writable `[2]` Uplink ID, matching Active Batch Programmer terminology |
-| Label Group writes | Ready-made profiles write both `uplinkId` and the firmware `labelGroupId` metadata so Active Batch Programmer and the app agree |
+| Label Group writes | Ready-made profiles write `uplinkId` and firmware `labelGroupId` metadata for firmware-supported groups; groups 0-1 follow Active Batch Programmer behavior |
 | Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
 | Native modal flow | Confirmation, success, and runtime error dialogs use the same ImGui interface |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
