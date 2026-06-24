@@ -233,18 +233,6 @@ bool parseInteger(const std::string& input, long long& value) {
     }
 }
 
-std::optional<long long> metadataInteger(const activetag::Snapshot& snapshot, const std::string& key) {
-    const auto it = snapshot.metadata.find(key);
-    if (it == snapshot.metadata.end()) {
-        return std::nullopt;
-    }
-    long long value = 0;
-    if (!parseInteger(it->second, value)) {
-        return std::nullopt;
-    }
-    return value;
-}
-
 bool isDisabledLedValue(long long value) {
     return value == kLedDisabledWriteValue || value == kLedDisabledLegacyValue;
 }
@@ -1150,11 +1138,8 @@ void drawMainUi() {
     drawNumberField("Uplink ID", "2", g_app.selectedProfile == 0);
     const auto labelGroupIt = g_app.values.find("2");
     drawReadOnlyNumberField(
-        "Profile / Uplink Group",
+        "Label Group",
         labelGroupIt == g_app.values.end() ? 0 : labelGroupIt->second);
-    if (const auto firmwareLabelGroup = metadataInteger(g_app.snapshot, "labelGroupId")) {
-        drawReadOnlyNumberField("Firmware labelGroupId", *firmwareLabelGroup);
-    }
     drawNumberField("RF Channel", "3");
     drawNumberField("Signal Intensity", "6");
     drawNumberField("LED Brightness", "4");

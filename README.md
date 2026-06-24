@@ -39,7 +39,7 @@ computer.
 | Lens Profiling | Applies Profile TAG 1-2 / Label Group 21-22 with LEDs 0-3 active and LEDs 4-7 disabled |
 | Automatic profile selection | Opens the matching Camera Tracker, Talent Tracker, or Lens Profiling product after reading the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
-| Profile group display | Shows the writable `[2] uplinkId` separately from the firmware read-only `[-] labelGroupId` metadata |
+| Label Group display | Shows the selected profile Label Group alongside the writable `[2]` Uplink ID, matching Active Batch Programmer terminology |
 | Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
 | Native modal flow | Confirmation, success, and runtime error dialogs use the same ImGui interface |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
