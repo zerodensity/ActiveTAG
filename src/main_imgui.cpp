@@ -145,7 +145,19 @@ std::wstring timestampLines(const std::wstring& text) {
 }
 
 std::wstring logTextForUi(const std::wstring& text) {
-    return text;
+    std::wstring normalized = text;
+    std::replace(normalized.begin(), normalized.end(), L'\r', L'\n');
+
+    std::wstringstream input(normalized);
+    std::wstring line;
+    std::wstring output;
+    while (std::getline(input, line, L'\n')) {
+        if (line.find(L"labelGroupId") != std::wstring::npos) {
+            continue;
+        }
+        output += line + L"\n";
+    }
+    return output;
 }
 
 bool openLogFile() {
