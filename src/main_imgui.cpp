@@ -869,6 +869,33 @@ void drawReadOnlyNumberField(const char* label, long long value) {
     ImGui::EndDisabled();
 }
 
+void drawRangeComboField(
+    const char* label,
+    const std::string& id,
+    int minimum,
+    int maximum,
+    const char* placeholder) {
+    const long long current = g_app.values[id];
+    const bool valid = current >= minimum && current <= maximum;
+    const std::string currentText = valid ? std::to_string(current) : placeholder;
+
+    ImGui::TextUnformatted(label);
+    ImGui::SetNextItemWidth(std::min(190.0f, ImGui::GetContentRegionAvail().x));
+    if (ImGui::BeginCombo(("##range-" + id).c_str(), currentText.c_str())) {
+        for (int value = minimum; value <= maximum; ++value) {
+            const std::string itemLabel = std::to_string(value);
+            const bool selected = current == value;
+            if (ImGui::Selectable(itemLabel.c_str(), selected)) {
+                g_app.values[id] = value;
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
+
 void drawLedField(int led) {
     const std::string id = "D" + std::to_string(led);
     long long value = g_app.values[id];
@@ -1162,9 +1189,9 @@ void drawMainUi() {
     drawReadOnlyNumberField(
         "Label Group",
         labelGroupIt == g_app.values.end() ? 0 : labelGroupIt->second);
-    drawNumberField("RF Channel", "3");
-    drawNumberField("Signal Intensity", "6");
-    drawNumberField("LED Brightness", "4");
+    drawRangeComboField("RF Channel", "3", 11, 26, "Select RF Channel");
+    drawRangeComboField("Signal Intensity", "6", 1, 6, "Select Signal Intensity");
+    drawRangeComboField("LED Brightness", "4", 20, 100, "Select LED Brightness");
     drawNumberField("On While Charging", "5");
     ImGui::PopStyleVar(2);
     ImGui::Columns(1);
