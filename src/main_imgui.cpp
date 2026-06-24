@@ -145,26 +145,7 @@ std::wstring timestampLines(const std::wstring& text) {
 }
 
 std::wstring logTextForUi(const std::wstring& text) {
-    std::wstring normalized = text;
-    std::replace(normalized.begin(), normalized.end(), L'\r', L'\n');
-
-    std::wstringstream input(normalized);
-    std::wstring line;
-    std::wstring output;
-    while (std::getline(input, line, L'\n')) {
-        const std::wstring labelGroupToken = L"labelGroupId";
-        if (line.find(L"[-]") != std::wstring::npos) {
-            const std::size_t position = line.find(labelGroupToken);
-            if (position != std::wstring::npos) {
-                line.replace(
-                    position,
-                    labelGroupToken.size(),
-                    L"firmwareLabelGroupId (read-only)");
-            }
-        }
-        output += line + L"\n";
-    }
-    return output;
+    return text;
 }
 
 bool openLogFile() {
@@ -608,6 +589,11 @@ std::map<std::string, long long> collectValues() {
     for (const auto& id : {"2", "3", "4", "5", "6", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}) {
         if (const auto it = g_app.values.find(id); it != g_app.values.end()) {
             values[id] = it->second;
+        }
+    }
+    if (g_app.selectedProfile > 0) {
+        if (const auto it = g_app.values.find("2"); it != g_app.values.end()) {
+            values["labelGroupId"] = it->second;
         }
     }
     return values;

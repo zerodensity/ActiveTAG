@@ -16,6 +16,8 @@ const std::set<std::string> documentedFirmware2Fields = {
 
 constexpr long long disabledLedWriteValue = 0xFFFFFFFFLL;
 constexpr long long disabledLedLegacyValue = 0x7FFFFFFFLL;
+constexpr const char* requestedLabelGroupField = "labelGroupId";
+constexpr const char* hiddenLabelGroupAddress = "23C0";
 
 std::string trim(std::string value) {
     const auto first = value.find_first_not_of(" \t\r\n");
@@ -46,6 +48,16 @@ bool fieldMatchesExpectedLed(long long actual, long long expected) {
         return isDisabledLedValue(actual);
     }
     return actual == expected;
+}
+
+std::optional<long long> metadataNumber(
+    const Snapshot& snapshot,
+    const std::string& key) {
+    const auto it = snapshot.metadata.find(key);
+    if (it == snapshot.metadata.end()) {
+        return std::nullopt;
+    }
+    return parseNumber(it->second);
 }
 
 }  // namespace
@@ -87,8 +99,19 @@ std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
     const std::map<std::string, long long>& requested) {
     const Snapshot before = read();
     std::vector<Change> changes;
+    std::optional<long long> beforeLabelGroup = metadataNumber(before, requestedLabelGroupField);
 
     for (const auto& [id, target] : requested) {
+        if (id == requestedLabelGroupField) {
+            if (target < 0 || target > 255) {
+                throw std::runtime_error("Label Group must be between 0 and 255.");
+            }
+            if (!beforeLabelGroup || *beforeLabelGroup != target) {
+                changes.push_back({requestedLabelGroupField, beforeLabelGroup.value_or(-1), target});
+            }
+            continue;
+        }
+
         const auto fieldIt = before.fields.find(id);
         if (fieldIt == before.fields.end() || !fieldIt->second.supported) {
             throw std::runtime_error("Field [" + id + "] is not writable on this device.");
@@ -108,11 +131,26 @@ std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
     }
 
     for (const Change& change : changes) {
+        if (change.id == requestedLabelGroupField) {
+            serial_.command(
+                "s " + std::string(hiddenLabelGroupAddress) + " " +
+                formatSerialValueForWrite(change.after));
+            continue;
+        }
         serial_.command("s " + change.id + " " + formatSerialValueForWrite(change.after));
     }
 
     const Snapshot staged = read();
     for (const Change& change : changes) {
+        if (change.id == requestedLabelGroupField) {
+            const std::optional<long long> stagedLabelGroup =
+                metadataNumber(staged, requestedLabelGroupField);
+            if (!stagedLabelGroup || *stagedLabelGroup != change.after) {
+                throw std::runtime_error(
+                    "Verification failed for [labelGroupId]. Flash was not saved.");
+            }
+            continue;
+        }
         const auto fieldIt = staged.fields.find(change.id);
         if (fieldIt == staged.fields.end() || !fieldIt->second.hasNumericValue ||
             fieldIt->second.numericValue != change.after) {
@@ -127,6 +165,15 @@ std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
 
     const Snapshot saved = read();
     for (const Change& change : changes) {
+        if (change.id == requestedLabelGroupField) {
+            const std::optional<long long> savedLabelGroup =
+                metadataNumber(saved, requestedLabelGroupField);
+            if (!savedLabelGroup || *savedLabelGroup != change.after) {
+                throw std::runtime_error(
+                    "Saved value could not be verified for [labelGroupId].");
+            }
+            continue;
+        }
         const auto fieldIt = saved.fields.find(change.id);
         if (fieldIt == saved.fields.end() || !fieldIt->second.hasNumericValue ||
             fieldIt->second.numericValue != change.after) {
