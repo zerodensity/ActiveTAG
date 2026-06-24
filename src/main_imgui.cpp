@@ -38,8 +38,8 @@ namespace {
 constexpr wchar_t kWindowClass[] = L"ZeroDensityActiveTAGImGuiWindow";
 constexpr wchar_t kWindowTitle[] = ACTIVETAG_WINDOW_TITLE_W;
 constexpr wchar_t kAppTitle[] = ACTIVETAG_APP_TITLE_W;
-constexpr long long kLedDisabledWriteValue = 0x7FFFFFFFLL;
-constexpr long long kLedDisabledLegacyValue = 0xFFFFFFFFLL;
+constexpr long long kLedDisabledWriteValue = 0xFFFFFFFFLL;
+constexpr long long kLedDisabledLegacyValue = 0x7FFFFFFFLL;
 
 enum class ProductType {
     Camera,
@@ -268,14 +268,14 @@ int productIndex(ProductType product) {
     return 0;
 }
 
-int visibleLedCountForProduct(ProductType product) {
+std::vector<int> visibleLedIndicesForProduct(ProductType product) {
     if (product == ProductType::TalentTrack) {
-        return 1;
+        return {4};
     }
     if (product == ProductType::LensProfiling) {
-        return 4;
+        return {0, 1, 2, 3};
     }
-    return 8;
+    return {0, 1, 2, 3, 4, 5, 6, 7};
 }
 
 std::vector<std::string> profileNames(ProductType product) {
@@ -287,7 +287,7 @@ std::vector<std::string> profileNames(ProductType product) {
         }
     } else if (product == ProductType::TalentTrack) {
         for (int group = 6; group <= 20; ++group) {
-            names.push_back("Talent Track " + std::to_string(group - 5) +
+            names.push_back("Talent Tracker " + std::to_string(group - 5) +
                 " - Label Group " + std::to_string(group));
         }
     }
@@ -300,7 +300,7 @@ std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
             L" / Label Group " + std::to_wstring(*snapshot.detectedLabelGroup);
     }
     if (snapshot.detectedTalentTrackGroup) {
-        return L"Talent Track " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
+        return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedTalentTrackGroup);
     }
     return L"Custom";
@@ -560,7 +560,7 @@ std::optional<std::string> customProfileConflictMessage() {
         }
     }
 
-    for (int led = 0; led < visibleLedCountForProduct(g_app.product); ++led) {
+    for (const int led : visibleLedIndicesForProduct(g_app.product)) {
         const auto valueIt = g_app.values.find("D" + std::to_string(led));
         if (valueIt != g_app.values.end() && knownActiveLedIds.contains(valueIt->second)) {
             return "This ID is in use!\n\nLED " + std::to_string(led) +
@@ -801,8 +801,8 @@ void drawSectionHeader(const char* label) {
     ImGui::Dummy(ImVec2(0, 12));
 }
 
-int visibleLedCount() {
-    return visibleLedCountForProduct(g_app.product);
+std::vector<int> visibleLedIndices() {
+    return visibleLedIndicesForProduct(g_app.product);
 }
 
 void drawModalDialog() {
@@ -1031,7 +1031,7 @@ void drawMainUi() {
     drawSectionHeader("LED Active IDs");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 3));
-    for (int led = 0; led < visibleLedCount(); ++led) {
+    for (const int led : visibleLedIndices()) {
         drawLedField(led);
     }
     ImGui::PopStyleVar(2);

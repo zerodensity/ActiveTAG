@@ -85,18 +85,32 @@ int main() {
             std::cerr << "Talent Track group " << group << " was misidentified as CAM.\n";
             return 1;
         }
-        for (int led = 1; led < 8; ++led) {
-            if (snapshot.fields.at("D" + std::to_string(led)).numericValue !=
-                0x7FFFFFFFLL) {
+        for (int led = 0; led < 8; ++led) {
+            const long long value = snapshot.fields.at("D" + std::to_string(led)).numericValue;
+            if (led == 4) {
+                if (value != talentGroups[index][4]) {
+                    std::cerr << "Talent Track active LED 4 mismatch for group "
+                              << group << ".\n";
+                    return 1;
+                }
+                continue;
+            }
+            if (value != 0xFFFFFFFFLL) {
                 std::cerr << "Talent Track disabled LED mismatch for group "
                           << group << ".\n";
                 return 1;
             }
         }
+        if (group == 6 && snapshot.fields.at("D4").numericValue != 0x804) {
+            std::cerr << "Talent Track Label Group 6 should use LED 4 ID 0x804.\n";
+            return 1;
+        }
 
         auto legacyDisabled = talentGroups[index];
-        for (int led = 1; led < 8; ++led) {
-            legacyDisabled[led] = 0xFFFFFFFFLL;
+        for (int led = 0; led < 8; ++led) {
+            if (led != 4) {
+                legacyDisabled[led] = 0x7FFFFFFFLL;
+            }
         }
         const auto legacySnapshot =
             activetag::ActiveTag::parseDump(talentTrackDump(group, legacyDisabled));

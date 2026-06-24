@@ -394,7 +394,7 @@ std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
             L" / Label Group " + std::to_wstring(*snapshot.detectedLabelGroup);
     }
     if (snapshot.detectedTalentTrackGroup) {
-        return L"Talent Track " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
+        return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedTalentTrackGroup);
     }
     return L"Custom";
@@ -414,7 +414,7 @@ void populateProfileCombo(int selectedProfile = 0) {
     } else if (g.product == ProductType::TalentTrack) {
         for (int group = 6; group <= 20; ++group) {
             const std::wstring name =
-                L"Talent Track " + std::to_wstring(group - 5) +
+                L"Talent Tracker " + std::to_wstring(group - 5) +
                 L" - Label Group " + std::to_wstring(group);
             SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
         }
@@ -443,7 +443,7 @@ ProductType productFromIndex(int index) {
 
 const wchar_t* productLabel(ProductType product) {
     if (product == ProductType::TalentTrack) {
-        return L"Talent Track";
+        return L"Talent Tracker";
     }
     if (product == ProductType::LensProfiling) {
         return L"Lens Profiling";

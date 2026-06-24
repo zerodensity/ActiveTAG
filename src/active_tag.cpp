@@ -14,8 +14,8 @@ namespace {
 const std::set<std::string> documentedFirmware2Fields = {
     "2", "3", "4", "5", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"};
 
-constexpr long long disabledLedWriteValue = 0x7FFFFFFFLL;
-constexpr long long disabledLedLegacyValue = 0xFFFFFFFFLL;
+constexpr long long disabledLedWriteValue = 0xFFFFFFFFLL;
+constexpr long long disabledLedLegacyValue = 0x7FFFFFFFLL;
 
 std::string trim(std::string value) {
     const auto first = value.find_first_not_of(" \t\r\n");
@@ -256,21 +256,21 @@ const std::array<std::array<long long, 8>, 6>& ActiveTag::labelGroups() {
 const std::array<std::array<long long, 8>, 15>& ActiveTag::talentTrackGroups() {
     constexpr long long disabled = disabledLedWriteValue;
     static const std::array<std::array<long long, 8>, 15> groups = {{
-        {{0x201, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x14, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x802, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x109, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x242, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x844, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x92, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x248, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x824, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x8A, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x282, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x822, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x4A, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x281, disabled, disabled, disabled, disabled, disabled, disabled, disabled}},
-        {{0x812, disabled, disabled, disabled, disabled, disabled, disabled, disabled}}
+        {{disabled, disabled, disabled, disabled, 0x804, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x50, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x2008, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x424, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x908, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x2110, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x248, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x920, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x2090, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x228, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0xA08, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x2088, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x128, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0xA04, disabled, disabled, disabled}},
+        {{disabled, disabled, disabled, disabled, 0x2048, disabled, disabled, disabled}}
     }};
     return groups;
 }
