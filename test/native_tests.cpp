@@ -41,8 +41,8 @@ std::string lensProfileDump(int profileIndex, const std::array<long long, 8>& le
 }
 
 int main() {
-    if (activetag::ActiveTag::formatSerialValueForWrite(0xFFFFFFFFLL) != "0xFFFFFFFF") {
-        std::cerr << "Disabled LED write value must be sent as hex to avoid signed parser clamping.\n";
+    if (activetag::ActiveTag::formatSerialValueForWrite(0xFFFFFFFFLL) != "-1") {
+        std::cerr << "Disabled LED write value must be sent as -1 for firmware to store 0xFFFFFFFF.\n";
         return 1;
     }
     if (activetag::ActiveTag::formatSerialValueForWrite(2052) != "2052") {

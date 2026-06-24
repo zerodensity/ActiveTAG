@@ -60,9 +60,11 @@ The firmware 2.x configuration surface currently exposed by the application:
 | `[D0]` - `[D7]` | Active marker LED IDs |
 
 Fields reported as `[-]` are read-only. `[1] (unsupported)` is never written.
-Disabled LED IDs are written as `0xFFFFFFFF` (`4294967295`). The parser still
-recognizes older `0x7FFFFFFF` (`2147483647`) dumps as disabled so previously
-written tags can be detected safely.
+Disabled LED IDs are stored as `0xFFFFFFFF` (`4294967295`). The firmware serial
+setter receives this as `-1`; sending `4294967295` or `0xFFFFFFFF` through the
+PuTTY-style `s` command is clamped by firmware 2.3.4 to `0x7FFFFFFF`. The parser
+still recognizes older `0x7FFFFFFF` (`2147483647`) dumps as disabled so
+previously written tags can be detected safely.
 
 ## Log File
 

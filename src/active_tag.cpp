@@ -200,7 +200,7 @@ bool ActiveTag::isActiveTag(const Snapshot& snapshot) {
 
 std::string ActiveTag::formatSerialValueForWrite(long long value) {
     if (value == disabledLedWriteValue) {
-        return "0xFFFFFFFF";
+        return "-1";
     }
     return std::to_string(value);
 }
