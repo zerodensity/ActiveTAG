@@ -108,7 +108,7 @@ std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
     }
 
     for (const Change& change : changes) {
-        serial_.command("s " + change.id + " " + std::to_string(change.after));
+        serial_.command("s " + change.id + " " + formatSerialValueForWrite(change.after));
     }
 
     const Snapshot staged = read();
@@ -196,6 +196,13 @@ bool ActiveTag::isActiveTag(const Snapshot& snapshot) {
            snapshot.metadata.contains("serialNum") &&
            snapshot.fields.contains("D0") &&
            snapshot.fields.contains("D7");
+}
+
+std::string ActiveTag::formatSerialValueForWrite(long long value) {
+    if (value == disabledLedWriteValue) {
+        return "0xFFFFFFFF";
+    }
+    return std::to_string(value);
 }
 
 std::optional<int> ActiveTag::detectLabelGroup(const Snapshot& snapshot) {

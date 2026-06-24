@@ -54,6 +54,7 @@ public:
     static std::optional<int> detectLabelGroup(const Snapshot& snapshot);
     static std::optional<int> detectTalentTrackGroup(const Snapshot& snapshot);
     static std::optional<int> detectLensProfile(const Snapshot& snapshot);
+    static std::string formatSerialValueForWrite(long long value);
     static const std::array<std::array<long long, 8>, 6>& labelGroups();
     static const std::array<std::array<long long, 8>, 15>& talentTrackGroups();
     static const std::array<std::array<long long, 8>, 2>& lensProfiles();

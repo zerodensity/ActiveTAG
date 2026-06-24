@@ -41,6 +41,15 @@ std::string lensProfileDump(int profileIndex, const std::array<long long, 8>& le
 }
 
 int main() {
+    if (activetag::ActiveTag::formatSerialValueForWrite(0xFFFFFFFFLL) != "0xFFFFFFFF") {
+        std::cerr << "Disabled LED write value must be sent as hex to avoid signed parser clamping.\n";
+        return 1;
+    }
+    if (activetag::ActiveTag::formatSerialValueForWrite(2052) != "2052") {
+        std::cerr << "Normal LED IDs should stay decimal in serial write commands.\n";
+        return 1;
+    }
+
     std::ifstream input("Active Putty Output.txt", std::ios::binary);
     if (!input) {
         std::cerr << "Fixture could not be opened.\n";
