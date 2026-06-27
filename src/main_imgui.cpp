@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <filesystem>
 #include <functional>
 #include <fstream>
@@ -708,12 +709,44 @@ void setTheme() {
     style.ItemSpacing = ImVec2(10, 8);
     style.FramePadding = ImVec2(10, 6);
     style.ScrollbarSize = 12.0f;
-    style.Colors[ImGuiCol_Header] = ImVec4(0.07f, 0.42f, 0.88f, 0.75f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.09f, 0.50f, 0.95f, 0.90f);
-    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.06f, 0.36f, 0.78f, 1.0f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.07f, 0.42f, 0.88f, 0.85f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.09f, 0.50f, 0.95f, 1.0f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.05f, 0.31f, 0.68f, 1.0f);
+    if (g_app.darkTheme) {
+        style.Colors[ImGuiCol_Header] = ImVec4(0.07f, 0.42f, 0.88f, 0.75f);
+        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.09f, 0.50f, 0.95f, 0.90f);
+        style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.06f, 0.36f, 0.78f, 1.0f);
+        style.Colors[ImGuiCol_Button] = ImVec4(0.07f, 0.42f, 0.88f, 0.85f);
+        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.09f, 0.50f, 0.95f, 1.0f);
+        style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.05f, 0.31f, 0.68f, 1.0f);
+        return;
+    }
+
+    style.Colors[ImGuiCol_Text] = ImVec4(0.08f, 0.11f, 0.18f, 1.0f);
+    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.38f, 0.45f, 0.56f, 1.0f);
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.96f, 0.98f, 1.0f, 1.0f);
+    style.Colors[ImGuiCol_ChildBg] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    style.Colors[ImGuiCol_PopupBg] = ImVec4(1.0f, 1.0f, 1.0f, 0.98f);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.68f, 0.74f, 0.83f, 1.0f);
+    style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.90f, 0.94f, 0.99f, 1.0f);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.82f, 0.89f, 1.0f, 1.0f);
+    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.74f, 0.84f, 0.98f, 1.0f);
+    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.90f, 0.94f, 0.99f, 1.0f);
+    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.82f, 0.89f, 0.98f, 1.0f);
+    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.04f, 0.34f, 0.76f, 1.0f);
+    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.07f, 0.38f, 0.80f, 0.85f);
+    style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.05f, 0.30f, 0.68f, 1.0f);
+    style.Colors[ImGuiCol_Button] = ImVec4(0.08f, 0.38f, 0.82f, 0.94f);
+    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.05f, 0.45f, 0.94f, 1.0f);
+    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.03f, 0.30f, 0.68f, 1.0f);
+    style.Colors[ImGuiCol_Header] = ImVec4(0.10f, 0.42f, 0.86f, 0.82f);
+    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.07f, 0.48f, 0.96f, 0.92f);
+    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.04f, 0.34f, 0.76f, 1.0f);
+    style.Colors[ImGuiCol_Separator] = ImVec4(0.70f, 0.76f, 0.84f, 1.0f);
+    style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.20f, 0.48f, 0.86f, 1.0f);
+    style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.05f, 0.34f, 0.78f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.92f, 0.95f, 0.99f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.66f, 0.73f, 0.83f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.52f, 0.63f, 0.78f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.40f, 0.52f, 0.70f, 1.0f);
 }
 
 bool createDeviceD3D(HWND hwnd) {
@@ -1041,7 +1074,10 @@ void drawModalDialog() {
 
 void drawDeviceHeader() {
     if (!g_app.connected) {
-        ImGui::TextColored(ImVec4(1.0f, 0.78f, 0.30f, 1.0f),
+        ImGui::TextColored(
+            g_app.darkTheme
+                ? ImVec4(1.0f, 0.78f, 0.30f, 1.0f)
+                : ImVec4(0.72f, 0.36f, 0.00f, 1.0f),
             "No Active Tag connected. New COM ports are probed automatically.");
         return;
     }
@@ -1056,6 +1092,60 @@ void drawDeviceHeader() {
     ImGui::Text("Profile: %s", wideToUtf8(currentProfileName(g_app.snapshot)).c_str());
 }
 
+void drawThemeToggle() {
+    constexpr float pi = 3.1415926535f;
+    const ImVec2 size(76.0f, 30.0f);
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const bool dark = g_app.darkTheme;
+
+    if (ImGui::InvisibleButton("##theme-toggle", size)) {
+        g_app.darkTheme = !g_app.darkTheme;
+        setTheme();
+    }
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const bool hovered = ImGui::IsItemHovered();
+    const ImU32 pillColor = ImGui::GetColorU32(
+        dark
+            ? (hovered ? ImVec4(0.10f, 0.16f, 0.26f, 1.0f) : ImVec4(0.07f, 0.11f, 0.18f, 1.0f))
+            : (hovered ? ImVec4(0.82f, 0.90f, 1.0f, 1.0f) : ImVec4(0.88f, 0.93f, 1.0f, 1.0f)));
+    const ImU32 selectedColor = ImGui::GetColorU32(
+        dark ? ImVec4(0.07f, 0.42f, 0.88f, 1.0f) : ImVec4(1.0f, 0.79f, 0.24f, 1.0f));
+    const ImU32 borderColor = ImGui::GetColorU32(
+        dark ? ImVec4(0.20f, 0.27f, 0.38f, 1.0f) : ImVec4(0.66f, 0.73f, 0.83f, 1.0f));
+    const ImU32 sunColor = ImGui::GetColorU32(
+        dark ? ImVec4(0.52f, 0.60f, 0.70f, 1.0f) : ImVec4(0.12f, 0.11f, 0.09f, 1.0f));
+    const ImU32 moonColor = ImGui::GetColorU32(
+        dark ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.36f, 0.43f, 0.54f, 1.0f));
+
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), pillColor, 15.0f);
+    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), borderColor, 15.0f);
+
+    const ImVec2 sunCenter(pos.x + 22.0f, pos.y + 15.0f);
+    const ImVec2 moonCenter(pos.x + 54.0f, pos.y + 15.0f);
+    const ImVec2 selectedCenter = dark ? moonCenter : sunCenter;
+    drawList->AddCircleFilled(selectedCenter, 12.0f, selectedColor, 24);
+
+    drawList->AddCircleFilled(sunCenter, 3.8f, sunColor, 16);
+    for (int ray = 0; ray < 8; ++ray) {
+        const float angle = (static_cast<float>(ray) / 8.0f) * 2.0f * pi;
+        const ImVec2 inner(
+            sunCenter.x + std::cos(angle) * 6.4f,
+            sunCenter.y + std::sin(angle) * 6.4f);
+        const ImVec2 outer(
+            sunCenter.x + std::cos(angle) * 9.0f,
+            sunCenter.y + std::sin(angle) * 9.0f);
+        drawList->AddLine(inner, outer, sunColor, 1.6f);
+    }
+
+    drawList->AddCircleFilled(moonCenter, 6.8f, moonColor, 20);
+    drawList->AddCircleFilled(
+        ImVec2(moonCenter.x + 3.2f, moonCenter.y - 1.6f),
+        6.8f,
+        dark ? selectedColor : pillColor,
+        20);
+}
+
 void drawMainUi() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -1066,12 +1156,8 @@ void drawMainUi() {
         ImGuiWindowFlags_NoScrollWithMouse);
 
     ImGui::Text("%s", wideToUtf8(kAppTitle).c_str());
-    ImGui::SameLine(ImGui::GetWindowWidth() - 145);
-    bool dark = g_app.darkTheme;
-    if (ImGui::Checkbox("Dark theme", &dark)) {
-        g_app.darkTheme = dark;
-        setTheme();
-    }
+    ImGui::SameLine(ImGui::GetWindowWidth() - 96);
+    drawThemeToggle();
     ImGui::Separator();
 
     drawDeviceHeader();
@@ -1340,7 +1426,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         ImGui::NewFrame();
         drawMainUi();
         ImGui::Render();
-        const float clearColor[4] = {0.08f, 0.09f, 0.11f, 1.0f};
+        const float clearColor[4] = {
+            g_app.darkTheme ? 0.08f : 0.96f,
+            g_app.darkTheme ? 0.09f : 0.98f,
+            g_app.darkTheme ? 0.11f : 1.0f,
+            1.0f};
         g_dx.context->OMSetRenderTargets(1, &g_dx.renderTarget, nullptr);
         g_dx.context->ClearRenderTargetView(g_dx.renderTarget, clearColor);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
