@@ -4,8 +4,8 @@
 IDI_ACTIVETAG ICON "../../assets/ActiveTAG-Configurator.ico"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,7,2,0
- PRODUCTVERSION 0,7,2,0
+ FILEVERSION 0,7,3,0
+ PRODUCTVERSION 0,7,3,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -22,11 +22,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "ActiveTAG Project\0"
             VALUE "FileDescription", "Native OptiTrack Active Tag Configurator\0"
-            VALUE "FileVersion", "0.7.2.0\0"
+            VALUE "FileVersion", "0.7.3.0\0"
             VALUE "InternalName", "ActiveTAG-Configurator\0"
-            VALUE "OriginalFilename", "ActiveTAG-Configurator-v0.7.2.exe\0"
+            VALUE "OriginalFilename", "ActiveTAG-Configurator-v0.7.3.exe\0"
             VALUE "ProductName", "ActiveTAG Configurator\0"
-            VALUE "ProductVersion", "v0.7.2\0"
+            VALUE "ProductVersion", "v0.7.3\0"
         END
     END
     BLOCK "VarFileInfo"

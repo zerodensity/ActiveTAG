@@ -719,34 +719,34 @@ void setTheme() {
         return;
     }
 
-    style.Colors[ImGuiCol_Text] = ImVec4(0.08f, 0.11f, 0.18f, 1.0f);
-    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.38f, 0.45f, 0.56f, 1.0f);
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.96f, 0.98f, 1.0f, 1.0f);
-    style.Colors[ImGuiCol_ChildBg] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    style.Colors[ImGuiCol_PopupBg] = ImVec4(1.0f, 1.0f, 1.0f, 0.98f);
-    style.Colors[ImGuiCol_Border] = ImVec4(0.68f, 0.74f, 0.83f, 1.0f);
+    style.Colors[ImGuiCol_Text] = ImVec4(0.10f, 0.09f, 0.08f, 1.0f);
+    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.46f, 0.43f, 0.38f, 1.0f);
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.97f, 0.96f, 0.93f, 1.0f);
+    style.Colors[ImGuiCol_ChildBg] = ImVec4(1.0f, 0.995f, 0.975f, 1.0f);
+    style.Colors[ImGuiCol_PopupBg] = ImVec4(1.0f, 0.995f, 0.975f, 0.98f);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.72f, 0.68f, 0.60f, 1.0f);
     style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.90f, 0.94f, 0.99f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.82f, 0.89f, 1.0f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.74f, 0.84f, 0.98f, 1.0f);
-    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.90f, 0.94f, 0.99f, 1.0f);
-    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.82f, 0.89f, 0.98f, 1.0f);
-    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.04f, 0.34f, 0.76f, 1.0f);
-    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.07f, 0.38f, 0.80f, 0.85f);
-    style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.05f, 0.30f, 0.68f, 1.0f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.08f, 0.38f, 0.82f, 0.94f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.05f, 0.45f, 0.94f, 1.0f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.03f, 0.30f, 0.68f, 1.0f);
-    style.Colors[ImGuiCol_Header] = ImVec4(0.10f, 0.42f, 0.86f, 0.82f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.07f, 0.48f, 0.96f, 0.92f);
-    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.04f, 0.34f, 0.76f, 1.0f);
-    style.Colors[ImGuiCol_Separator] = ImVec4(0.70f, 0.76f, 0.84f, 1.0f);
-    style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.20f, 0.48f, 0.86f, 1.0f);
-    style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.05f, 0.34f, 0.78f, 1.0f);
-    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.92f, 0.95f, 0.99f, 1.0f);
-    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.66f, 0.73f, 0.83f, 1.0f);
-    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.52f, 0.63f, 0.78f, 1.0f);
-    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.40f, 0.52f, 0.70f, 1.0f);
+    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.91f, 0.89f, 0.84f, 1.0f);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.86f, 0.83f, 0.76f, 1.0f);
+    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.79f, 0.75f, 0.66f, 1.0f);
+    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.91f, 0.89f, 0.84f, 1.0f);
+    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.84f, 0.80f, 0.72f, 1.0f);
+    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.18f, 0.16f, 0.13f, 1.0f);
+    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.48f, 0.42f, 0.32f, 0.90f);
+    style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.32f, 0.27f, 0.20f, 1.0f);
+    style.Colors[ImGuiCol_Button] = ImVec4(0.86f, 0.83f, 0.76f, 1.0f);
+    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.78f, 0.74f, 0.65f, 1.0f);
+    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.62f, 0.56f, 0.46f, 1.0f);
+    style.Colors[ImGuiCol_Header] = ImVec4(0.86f, 0.82f, 0.72f, 0.90f);
+    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.75f, 0.68f, 0.54f, 0.95f);
+    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.16f, 0.15f, 0.13f, 1.0f);
+    style.Colors[ImGuiCol_Separator] = ImVec4(0.70f, 0.66f, 0.58f, 1.0f);
+    style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.52f, 0.46f, 0.36f, 1.0f);
+    style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.30f, 0.26f, 0.20f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.92f, 0.90f, 0.86f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.68f, 0.63f, 0.54f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.56f, 0.50f, 0.40f, 1.0f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.40f, 0.35f, 0.28f, 1.0f);
 }
 
 bool createDeviceD3D(HWND hwnd) {
@@ -1108,15 +1108,15 @@ void drawThemeToggle() {
     const ImU32 pillColor = ImGui::GetColorU32(
         dark
             ? (hovered ? ImVec4(0.10f, 0.16f, 0.26f, 1.0f) : ImVec4(0.07f, 0.11f, 0.18f, 1.0f))
-            : (hovered ? ImVec4(0.82f, 0.90f, 1.0f, 1.0f) : ImVec4(0.88f, 0.93f, 1.0f, 1.0f)));
+            : (hovered ? ImVec4(0.86f, 0.82f, 0.74f, 1.0f) : ImVec4(0.92f, 0.89f, 0.82f, 1.0f)));
     const ImU32 selectedColor = ImGui::GetColorU32(
         dark ? ImVec4(0.07f, 0.42f, 0.88f, 1.0f) : ImVec4(1.0f, 0.79f, 0.24f, 1.0f));
     const ImU32 borderColor = ImGui::GetColorU32(
-        dark ? ImVec4(0.20f, 0.27f, 0.38f, 1.0f) : ImVec4(0.66f, 0.73f, 0.83f, 1.0f));
+        dark ? ImVec4(0.20f, 0.27f, 0.38f, 1.0f) : ImVec4(0.66f, 0.60f, 0.50f, 1.0f));
     const ImU32 sunColor = ImGui::GetColorU32(
         dark ? ImVec4(0.52f, 0.60f, 0.70f, 1.0f) : ImVec4(0.12f, 0.11f, 0.09f, 1.0f));
     const ImU32 moonColor = ImGui::GetColorU32(
-        dark ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.36f, 0.43f, 0.54f, 1.0f));
+        dark ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.40f, 0.36f, 0.30f, 1.0f));
 
     drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), pillColor, 15.0f);
     drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), borderColor, 15.0f);
@@ -1427,9 +1427,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         drawMainUi();
         ImGui::Render();
         const float clearColor[4] = {
-            g_app.darkTheme ? 0.08f : 0.96f,
-            g_app.darkTheme ? 0.09f : 0.98f,
-            g_app.darkTheme ? 0.11f : 1.0f,
+            g_app.darkTheme ? 0.08f : 0.97f,
+            g_app.darkTheme ? 0.09f : 0.96f,
+            g_app.darkTheme ? 0.11f : 0.93f,
             1.0f};
         g_dx.context->OMSetRenderTargets(1, &g_dx.renderTarget, nullptr);
         g_dx.context->ClearRenderTargetView(g_dx.renderTarget, clearColor);
