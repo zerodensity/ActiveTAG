@@ -896,6 +896,16 @@ void drawRangeComboField(
     }
 }
 
+void drawBoolCheckboxField(const char* label, const std::string& id) {
+    bool enabled = g_app.values[id] != 0;
+    ImGui::TextUnformatted(label);
+    if (ImGui::Checkbox(("##bool-" + id).c_str(), &enabled)) {
+        g_app.values[id] = enabled ? 1 : 0;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled(enabled ? "1" : "0");
+}
+
 void drawLedField(int led) {
     const std::string id = "D" + std::to_string(led);
     long long value = g_app.values[id];
@@ -1192,7 +1202,7 @@ void drawMainUi() {
     drawRangeComboField("RF Channel", "3", 11, 26, "Select RF Channel");
     drawRangeComboField("Signal Intensity", "6", 1, 6, "Select Signal Intensity");
     drawRangeComboField("LED Brightness", "4", 20, 100, "Select LED Brightness");
-    drawNumberField("On While Charging", "5");
+    drawBoolCheckboxField("On While Charging", "5");
     ImGui::PopStyleVar(2);
     ImGui::Columns(1);
     ImGui::EndChild();

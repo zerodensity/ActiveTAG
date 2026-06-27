@@ -43,6 +43,7 @@ computer.
 | Label Group writes | Ready-made profiles write `uplinkId` and firmware `labelGroupId` metadata for firmware-supported groups; groups 0-1 follow Active Batch Programmer behavior |
 | Clean serial view | Hides the firmware `labelGroupId` dump line from the on-screen serial log to avoid operator confusion while preserving raw file diagnostics |
 | Radio and LED guards | Restricts RF Channel to 11-26, Signal Intensity to 1-6, and LED Brightness to 20-100 through dropdowns |
+| Charging toggle | Sends On While Charging as a checkbox value, `1` when checked and `0` when unchecked |
 | Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
 | Native modal flow | Confirmation, success, and runtime error dialogs use the same ImGui interface |
 | Safe write | Stages values with `s`, verifies with `d`, saves with `v`, then verifies again |
