@@ -41,6 +41,7 @@ constexpr wchar_t kWindowTitle[] = ACTIVETAG_WINDOW_TITLE_W;
 constexpr wchar_t kAppTitle[] = ACTIVETAG_APP_TITLE_W;
 constexpr long long kLedDisabledWriteValue = 0xFFFFFFFFLL;
 constexpr long long kLedDisabledLegacyValue = 0x7FFFFFFFLL;
+constexpr long long kDefaultLedBrightness = 20;
 
 enum class ProductType {
     Camera,
@@ -75,7 +76,7 @@ struct AppState {
     activetag::ActiveTag tag;
     activetag::Snapshot snapshot;
     std::vector<activetag::PortInfo> ports;
-    std::map<std::string, long long> values;
+    std::map<std::string, long long> values{{"4", kDefaultLedBrightness}};
     std::vector<std::wstring> uiLog;
     std::ofstream logFile;
     std::filesystem::path logPath;
@@ -386,6 +387,7 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
             g_app.values[id] = field.numericValue;
         }
     }
+    g_app.values.try_emplace("4", kDefaultLedBrightness);
     if (snapshot.detectedLabelGroup) {
         selectProduct(ProductType::Camera, *snapshot.detectedLabelGroup, true);
     } else if (snapshot.detectedTalentTrackGroup) {
@@ -400,6 +402,7 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
 void clearDeviceState() {
     g_app.snapshot = {};
     g_app.values.clear();
+    g_app.values["4"] = kDefaultLedBrightness;
     g_app.ledFieldsLocked = false;
     g_app.selectedProfile = 0;
 }

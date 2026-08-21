@@ -44,6 +44,7 @@ computer.
 | Label Group writes | Ready-made profiles write `uplinkId` and firmware `labelGroupId` metadata for firmware-supported groups; groups 0-1 follow Active Batch Programmer behavior |
 | Clean serial view | Hides the firmware `labelGroupId` dump line from the on-screen serial log to avoid operator confusion while preserving raw file diagnostics |
 | Radio and LED guards | Restricts RF Channel to 11-26, Signal Intensity to 1-6, and LED Brightness to 0-100 through dropdowns |
+| Safe editor defaults | Starts the editor with LED Brightness at 20 while still allowing users to choose 0-100 |
 | Charging toggle | Sends On While Charging as a checkbox value, `1` when checked and `0` when unchecked |
 | Theme polish | Uses a higher-contrast, blue-free light theme and a compact sun/moon theme toggle |
 | Modern UI | Uses Dear ImGui and DirectX 11 for a tool-style desktop interface |
