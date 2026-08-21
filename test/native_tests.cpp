@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,8 +23,24 @@ std::string talentTrackDump(int group, const std::array<long long, 8>& leds) {
     return dump.str();
 }
 
+std::string cameraDump(int group, const std::array<long long, 8>& leds) {
+    std::ostringstream dump;
+    dump << "FIRMWARE VERSION    : 2.3.4 (compiled May  8 2023 15:29:25)\n"
+         << "[-]  serialNum      : 29567\n"
+         << "[-]  hardwareRev    : G\n"
+         << "[2]  uplinkId       : " << group << "\n"
+         << "[3]  rfChannel      : 15\n"
+         << "[4]  ledBrightness  : 20\n"
+         << "[5]  onWhileCharging: 1\n";
+    for (int led = 0; led < 8; ++led) {
+        dump << "[D" << led << "] led" << led << "Id : "
+             << leds[led] << "\n";
+    }
+    return dump.str();
+}
+
 std::string lensProfileDump(int profileIndex, const std::array<long long, 8>& leds) {
-    const int uplink = profileIndex + 21;
+    const int uplink = profileIndex + 22;
     std::ostringstream dump;
     dump << "FIRMWARE VERSION    : 2.3.4 (compiled May  8 2023 15:29:25)\n"
          << "[-]  serialNum      : 32501\n"
@@ -80,8 +97,9 @@ int main() {
             std::cerr << "Dump " << index << " was not recognized as an Active Tag.\n";
             return 1;
         }
-        if (!snapshot.detectedLabelGroup || *snapshot.detectedLabelGroup != index) {
-            std::cerr << "Label Group mismatch for dump " << index << ".\n";
+        if (snapshot.detectedLabelGroup) {
+            std::cerr << "Old zero-based Camera dump " << index
+                      << " was incorrectly treated as a current profile.\n";
             return 1;
         }
         if (snapshot.detectedTalentTrackGroup) {
@@ -102,9 +120,46 @@ int main() {
         }
     }
 
+    const auto& cameraGroups = activetag::ActiveTag::labelGroups();
+    std::set<int> reservedUplinks;
+    std::set<long long> activeLedIds;
+    auto rememberActiveLedId = [&](long long value) {
+        if (value == 0xFFFFFFFFLL || value == 0x7FFFFFFFLL) {
+            return true;
+        }
+        return activeLedIds.insert(value).second;
+    };
+
+    for (int index = 0; index < static_cast<int>(cameraGroups.size()); ++index) {
+        const int group = index + 1;
+        reservedUplinks.insert(group);
+        const auto snapshot =
+            activetag::ActiveTag::parseDump(cameraDump(group, cameraGroups[index]));
+        if (!snapshot.detectedLabelGroup || *snapshot.detectedLabelGroup != group) {
+            std::cerr << "Camera mismatch for Label Group " << group << ".\n";
+            return 1;
+        }
+        if (snapshot.detectedTalentTrackGroup) {
+            std::cerr << "Camera group " << group << " was misidentified as Talent Track.\n";
+            return 1;
+        }
+        if (snapshot.detectedLensProfile) {
+            std::cerr << "Camera group " << group << " was misidentified as Lens Profiling.\n";
+            return 1;
+        }
+        for (const long long value : cameraGroups[index]) {
+            if (!rememberActiveLedId(value)) {
+                std::cerr << "Duplicate active LED ID in Camera Label Group "
+                          << group << ".\n";
+                return 1;
+            }
+        }
+    }
+
     const auto& talentGroups = activetag::ActiveTag::talentTrackGroups();
     for (int index = 0; index < static_cast<int>(talentGroups.size()); ++index) {
-        const int group = index + 6;
+        const int group = index + 7;
+        reservedUplinks.insert(group);
         const auto snapshot =
             activetag::ActiveTag::parseDump(talentTrackDump(group, talentGroups[index]));
         if (!snapshot.detectedTalentTrackGroup ||
@@ -137,13 +192,20 @@ int main() {
                 return 1;
             }
         }
-        if (group == 6 && snapshot.fields.at("D7").numericValue != 0x804) {
-            std::cerr << "Talent Track Label Group 6 should use LED 7 ID 0x804.\n";
+        if (group == 7 && snapshot.fields.at("D7").numericValue != 0x804) {
+            std::cerr << "Talent Track Label Group 7 should use LED 7 ID 0x804.\n";
             return 1;
         }
-        if (group == 6 && snapshot.fields.at("D3").numericValue != 0xFFFFFFFFLL) {
-            std::cerr << "Talent Track Label Group 6 should disable LED 3.\n";
+        if (group == 7 && snapshot.fields.at("D3").numericValue != 0xFFFFFFFFLL) {
+            std::cerr << "Talent Track Label Group 7 should disable LED 3.\n";
             return 1;
+        }
+        for (const long long value : talentGroups[index]) {
+            if (!rememberActiveLedId(value)) {
+                std::cerr << "Duplicate active LED ID in Talent Track Label Group "
+                          << group << ".\n";
+                return 1;
+            }
         }
 
         auto legacyDisabled = talentGroups[index];
@@ -169,6 +231,7 @@ int main() {
         return 1;
     }
     for (int index = 0; index < static_cast<int>(lensProfiles.size()); ++index) {
+        reservedUplinks.insert(index + 22);
         const auto snapshot =
             activetag::ActiveTag::parseDump(lensProfileDump(index, lensProfiles[index]));
         if (!snapshot.detectedLensProfile || *snapshot.detectedLensProfile != index) {
@@ -198,6 +261,11 @@ int main() {
                           << " disabled LED mismatch.\n";
                 return 1;
             }
+            if (!rememberActiveLedId(value)) {
+                std::cerr << "Duplicate active LED ID in Lens Profile TAG "
+                          << (index + 1) << ".\n";
+                return 1;
+            }
         }
 
         auto legacyDisabled = lensProfiles[index];
@@ -211,6 +279,13 @@ int main() {
                       << " mismatch.\n";
             return 1;
         }
+    }
+
+    if (reservedUplinks.size() != 23 ||
+        *reservedUplinks.begin() != 1 ||
+        *reservedUplinks.rbegin() != 23) {
+        std::cerr << "Ready-made profiles must reserve contiguous Label Groups 1-23.\n";
+        return 1;
     }
 
     std::cout << "All native parser tests passed.\n";

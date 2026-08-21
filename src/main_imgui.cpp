@@ -299,34 +299,34 @@ std::vector<int> visibleLedIndicesForProduct(ProductType product) {
 std::vector<std::string> profileNames(ProductType product) {
     std::vector<std::string> names{"Custom"};
     if (product == ProductType::Camera) {
-        for (int group = 0; group < 6; ++group) {
-            names.push_back("CAM" + std::to_string(group + 1) +
+        for (int group = 1; group <= 6; ++group) {
+            names.push_back("CAM" + std::to_string(group) +
                 " - Label Group " + std::to_string(group));
         }
     } else if (product == ProductType::TalentTrack) {
-        for (int group = 6; group <= 20; ++group) {
-            names.push_back("Talent Tracker " + std::to_string(group - 5) +
+        for (int group = 7; group <= 21; ++group) {
+            names.push_back("Talent Tracker " + std::to_string(group - 6) +
                 " - Label Group " + std::to_string(group));
         }
     } else if (product == ProductType::LensProfiling) {
-        names.push_back("Profile TAG 1");
-        names.push_back("Profile TAG 2");
+        names.push_back("Profile TAG 1 - Label Group 22");
+        names.push_back("Profile TAG 2 - Label Group 23");
     }
     return names;
 }
 
 std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
     if (snapshot.detectedLabelGroup) {
-        return L"CAM" + std::to_wstring(*snapshot.detectedLabelGroup + 1) +
+        return L"CAM" + std::to_wstring(*snapshot.detectedLabelGroup) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedLabelGroup);
     }
     if (snapshot.detectedTalentTrackGroup) {
-        return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
+        return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 6) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedTalentTrackGroup);
     }
     if (snapshot.detectedLensProfile) {
         return L"Profile TAG " + std::to_wstring(*snapshot.detectedLensProfile + 1) +
-            L" / Label Group " + std::to_wstring(*snapshot.detectedLensProfile + 21);
+            L" / Label Group " + std::to_wstring(*snapshot.detectedLensProfile + 22);
     }
     return L"Custom";
 }
@@ -351,16 +351,16 @@ void applyProfile(int selectedProfile) {
     const std::array<long long, 8>* leds = nullptr;
     int uplink = 0;
     if (g_app.product == ProductType::Camera && selectedProfile <= 6) {
-        uplink = selectedProfile - 1;
-        leds = &activetag::ActiveTag::labelGroups()[uplink];
+        uplink = selectedProfile;
+        leds = &activetag::ActiveTag::labelGroups()[selectedProfile - 1];
     } else if (g_app.product == ProductType::TalentTrack && selectedProfile <= 15) {
-        uplink = selectedProfile + 5;
+        uplink = selectedProfile + 6;
         leds = &activetag::ActiveTag::talentTrackGroups()[selectedProfile - 1];
         setValue("3", 20);
         setValue("4", 20);
         setValue("5", 1);
     } else if (g_app.product == ProductType::LensProfiling && selectedProfile <= 2) {
-        uplink = selectedProfile + 20;
+        uplink = selectedProfile + 21;
         leds = &activetag::ActiveTag::lensProfiles()[selectedProfile - 1];
         setValue("3", 20);
         setValue("4", 20);
@@ -387,9 +387,9 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
         }
     }
     if (snapshot.detectedLabelGroup) {
-        selectProduct(ProductType::Camera, *snapshot.detectedLabelGroup + 1, true);
+        selectProduct(ProductType::Camera, *snapshot.detectedLabelGroup, true);
     } else if (snapshot.detectedTalentTrackGroup) {
-        selectProduct(ProductType::TalentTrack, *snapshot.detectedTalentTrackGroup - 5, true);
+        selectProduct(ProductType::TalentTrack, *snapshot.detectedTalentTrackGroup - 6, true);
     } else if (snapshot.detectedLensProfile) {
         selectProduct(ProductType::LensProfiling, *snapshot.detectedLensProfile + 1, true);
     } else {
@@ -636,7 +636,7 @@ std::optional<std::string> customProfileConflictMessage() {
     }
 
     const auto uplinkIt = g_app.values.find("2");
-    if (uplinkIt != g_app.values.end() && uplinkIt->second >= 0 && uplinkIt->second <= 22) {
+    if (uplinkIt != g_app.values.end() && uplinkIt->second >= 1 && uplinkIt->second <= 23) {
         return "This ID is in use!\n\nUplink ID " + std::to_string(uplinkIt->second) +
             " is reserved by the known Label Group list.";
     }

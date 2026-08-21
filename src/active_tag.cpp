@@ -264,13 +264,23 @@ std::string ActiveTag::formatSerialValueForWrite(long long value) {
 }
 
 std::optional<int> ActiveTag::detectLabelGroup(const Snapshot& snapshot) {
-    for (int group = 0; group < static_cast<int>(labelGroups().size()); ++group) {
+    const auto uplinkIt = snapshot.fields.find("2");
+    if (uplinkIt == snapshot.fields.end() || !uplinkIt->second.hasNumericValue) {
+        return std::nullopt;
+    }
+
+    for (int index = 0; index < static_cast<int>(labelGroups().size()); ++index) {
+        const int group = index + 1;
+        if (uplinkIt->second.numericValue != group) {
+            continue;
+        }
+
         bool matches = true;
         for (int led = 0; led < 8; ++led) {
             const auto fieldIt = snapshot.fields.find("D" + std::to_string(led));
             if (fieldIt == snapshot.fields.end() ||
                 !fieldIt->second.hasNumericValue ||
-                !fieldMatchesExpectedLed(fieldIt->second.numericValue, labelGroups()[group][led])) {
+                !fieldMatchesExpectedLed(fieldIt->second.numericValue, labelGroups()[index][led])) {
                 matches = false;
                 break;
             }
@@ -289,7 +299,7 @@ std::optional<int> ActiveTag::detectTalentTrackGroup(const Snapshot& snapshot) {
     }
 
     for (int index = 0; index < static_cast<int>(talentTrackGroups().size()); ++index) {
-        const int group = index + 6;
+        const int group = index + 7;
         if (uplinkIt->second.numericValue != group) {
             continue;
         }
@@ -318,7 +328,7 @@ std::optional<int> ActiveTag::detectLensProfile(const Snapshot& snapshot) {
     }
 
     for (int index = 0; index < static_cast<int>(lensProfiles().size()); ++index) {
-        const int expectedUplink = index + 21;
+        const int expectedUplink = index + 22;
         if (uplinkIt->second.numericValue != expectedUplink) {
             continue;
         }

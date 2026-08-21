@@ -390,11 +390,11 @@ void setFieldNumber(FieldUi& field, long long value) {
 
 std::wstring currentProfileName(const activetag::Snapshot& snapshot) {
     if (snapshot.detectedLabelGroup) {
-        return L"CAM" + std::to_wstring(*snapshot.detectedLabelGroup + 1) +
+        return L"CAM" + std::to_wstring(*snapshot.detectedLabelGroup) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedLabelGroup);
     }
     if (snapshot.detectedTalentTrackGroup) {
-        return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 5) +
+        return L"Talent Tracker " + std::to_wstring(*snapshot.detectedTalentTrackGroup - 6) +
             L" / Label Group " + std::to_wstring(*snapshot.detectedTalentTrackGroup);
     }
     return L"Custom";
@@ -405,16 +405,16 @@ void populateProfileCombo(int selectedProfile = 0) {
     SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Custom"));
 
     if (g.product == ProductType::Camera) {
-        for (int group = 0; group < 6; ++group) {
+        for (int group = 1; group <= 6; ++group) {
             const std::wstring name =
-                L"CAM" + std::to_wstring(group + 1) +
+                L"CAM" + std::to_wstring(group) +
                 L" - Label Group " + std::to_wstring(group);
             SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
         }
     } else if (g.product == ProductType::TalentTrack) {
-        for (int group = 6; group <= 20; ++group) {
+        for (int group = 7; group <= 21; ++group) {
             const std::wstring name =
-                L"Talent Tracker " + std::to_wstring(group - 5) +
+                L"Talent Tracker " + std::to_wstring(group - 6) +
                 L" - Label Group " + std::to_wstring(group);
             SendMessageW(g.groupCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
         }
@@ -496,12 +496,12 @@ void renderSnapshot(const activetag::Snapshot& snapshot) {
     if (snapshot.detectedLabelGroup) {
         selectProduct(
             ProductType::Camera,
-            *snapshot.detectedLabelGroup + 1,
+            *snapshot.detectedLabelGroup,
             true);
     } else if (snapshot.detectedTalentTrackGroup) {
         selectProduct(
             ProductType::TalentTrack,
-            *snapshot.detectedTalentTrackGroup - 5,
+            *snapshot.detectedTalentTrackGroup - 6,
             true);
     } else {
         populateProfileCombo(0);
@@ -748,10 +748,10 @@ void applyLabelGroup(int selection) {
     int uplink = 0;
     const std::array<long long, 8>* ledValues = nullptr;
     if (g.product == ProductType::Camera && selection <= 6) {
-        uplink = selection - 1;
-        ledValues = &activetag::ActiveTag::labelGroups()[uplink];
+        uplink = selection;
+        ledValues = &activetag::ActiveTag::labelGroups()[selection - 1];
     } else if (g.product == ProductType::TalentTrack && selection <= 15) {
-        uplink = selection + 5;
+        uplink = selection + 6;
         ledValues = &activetag::ActiveTag::talentTrackGroups()[selection - 1];
     } else {
         return;

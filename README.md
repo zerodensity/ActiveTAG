@@ -33,10 +33,11 @@ computer.
 | Config export | Saves a versioned `activetag-config/v1` JSON file |
 | Config import | Loads supported values into the editor before writing |
 | Manual override | Edits Uplink ID in Custom mode, RF Channel, Signal Intensity, LED Brightness, charging behavior and Custom LED IDs |
-| Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 0-5 LED patterns |
+| Camera profiles | CAM1-CAM6 apply and lock the verified Label Group 1-6 LED patterns |
 | Product selector | Separates Camera Tracker, Talent Tracker, and Lens Profiling profile families |
-| Talent Tracker | Applies Label Group 6-20 profiles with only LED 7 active |
-| Lens Profiling | Applies Profile TAG 1-2 / Label Group 21-22 with LEDs 0-3 active and LEDs 4-7 disabled |
+| Talent Tracker | Applies Label Group 7-21 profiles with only LED 7 active |
+| Lens Profiling | Applies Profile TAG 1-2 / Label Group 22-23 with LEDs 0-3 active and LEDs 4-7 disabled |
+| Reserved profile range | Ready-made profiles reserve contiguous Label Groups 1-23 with duplicate LED ID checks in native tests |
 | Automatic profile selection | Opens the matching Camera Tracker, Talent Tracker, or Lens Profiling product after reading the connected device |
 | LED ID display | Shows hexadecimal IDs in the editor and decimal values underneath |
 | Label Group display | Shows the selected profile Label Group alongside the writable `[2]` Uplink ID, matching Active Batch Programmer terminology |
