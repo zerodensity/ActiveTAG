@@ -1287,7 +1287,7 @@ void drawMainUi() {
         labelGroupIt == g_app.values.end() ? 0 : labelGroupIt->second);
     drawRangeComboField("RF Channel", "3", 11, 26, "Select RF Channel");
     drawRangeComboField("Signal Intensity", "6", 1, 6, "Select Signal Intensity");
-    drawRangeComboField("LED Brightness", "4", 20, 100, "Select LED Brightness");
+    drawRangeComboField("LED Brightness", "4", 0, 100, "Select LED Brightness");
     drawBoolCheckboxField("On While Charging", "5");
     ImGui::PopStyleVar(2);
     ImGui::Columns(1);

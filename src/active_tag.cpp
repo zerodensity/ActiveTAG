@@ -130,8 +130,8 @@ std::pair<Snapshot, std::vector<Change>> ActiveTag::apply(
         if (id == "6" && (target < 1 || target > 6)) {
             throw std::runtime_error("Signal Intensity must be between 1 and 6.");
         }
-        if (id == "4" && (target < 20 || target > 100)) {
-            throw std::runtime_error("LED Brightness must be between 20 and 100.");
+        if (id == "4" && (target < 0 || target > 100)) {
+            throw std::runtime_error("LED Brightness must be between 0 and 100.");
         }
         if (id == "5" && target != 0 && target != 1) {
             throw std::runtime_error("On While Charging accepts only 0 or 1.");
