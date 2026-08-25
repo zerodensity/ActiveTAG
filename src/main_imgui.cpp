@@ -41,6 +41,7 @@ constexpr wchar_t kWindowTitle[] = ACTIVETAG_WINDOW_TITLE_W;
 constexpr wchar_t kAppTitle[] = ACTIVETAG_APP_TITLE_W;
 constexpr long long kLedDisabledWriteValue = 0xFFFFFFFFLL;
 constexpr long long kLedDisabledLegacyValue = 0x7FFFFFFFLL;
+constexpr long long kDefaultRfChannel = 15;
 constexpr long long kDefaultLedBrightness = 20;
 
 enum class ProductType {
@@ -76,7 +77,10 @@ struct AppState {
     activetag::ActiveTag tag;
     activetag::Snapshot snapshot;
     std::vector<activetag::PortInfo> ports;
-    std::map<std::string, long long> values{{"4", kDefaultLedBrightness}};
+    std::map<std::string, long long> values{
+        {"3", kDefaultRfChannel},
+        {"4", kDefaultLedBrightness},
+    };
     std::vector<std::wstring> uiLog;
     std::ofstream logFile;
     std::filesystem::path logPath;
