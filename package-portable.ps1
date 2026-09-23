@@ -10,6 +10,7 @@ $exeName = "ActiveTAG-Configurator-$displayVersion.exe"
 $exe = Join-Path $root "build\$exeName"
 $packageRoot = Join-Path $root "dist\ActiveTAG-Configurator-$displayVersion-Portable"
 $zipPath = Join-Path $root "dist\ActiveTAG-Configurator-$displayVersion-Portable-x64.zip"
+$checksumPath = Join-Path $root "dist\$exeName.sha256"
 
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "Build output not found. Run build.cmd first."
@@ -21,6 +22,9 @@ if (Test-Path -LiteralPath $packageRoot) {
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
+if (Test-Path -LiteralPath $checksumPath) {
+    Remove-Item -LiteralPath $checksumPath -Force
+}
 
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 Copy-Item -LiteralPath $exe -Destination $packageRoot
@@ -29,4 +33,7 @@ Copy-Item -LiteralPath (Join-Path $root "deploy\Run-Dependency-Check.cmd") -Dest
 Copy-Item -LiteralPath (Join-Path $root "deploy\README.txt") -Destination $packageRoot
 
 Compress-Archive -LiteralPath $packageRoot -DestinationPath $zipPath -CompressionLevel Optimal
+$hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+Set-Content -LiteralPath $checksumPath -Value "$hash  $exeName" -Encoding ascii
 Write-Host "Portable package created: $zipPath"
+Write-Host "Release checksum created: $checksumPath"

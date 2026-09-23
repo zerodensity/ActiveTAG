@@ -12,9 +12,10 @@ if errorlevel 1 exit /b 1
 
 if not exist build mkdir build
 cl /nologo /std:c++20 /O2 /W4 /EHsc /permissive- /DUNICODE /D_UNICODE /DNOMINMAX /MT ^
-  "test\native_tests.cpp" "src\active_tag.cpp" "src\serial_port.cpp" ^
+  /I"third_party" ^
+  "test\native_tests.cpp" "src\auto_update.cpp" "src\active_tag.cpp" "src\serial_port.cpp" ^
   /Fe:"build\ActiveTAG-NativeTests.exe" ^
-  /link advapi32.lib
+  /link advapi32.lib winhttp.lib bcrypt.lib user32.lib
 if errorlevel 1 exit /b 1
 
 "build\ActiveTAG-NativeTests.exe"

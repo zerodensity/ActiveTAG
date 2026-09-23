@@ -1,4 +1,5 @@
 #include "active_tag.hpp"
+#include "auto_update.hpp"
 #include "generated/resource.h"
 #include "generated/version.hpp"
 
@@ -73,6 +74,28 @@ struct DxState {
     ID3D11RenderTargetView* renderTarget = nullptr;
 };
 
+enum class UpdateStatus {
+    Idle,
+    Checking,
+    Available,
+    Downloading,
+    Installing,
+    Dismissed,
+    Failed
+};
+
+struct UpdateState {
+    std::thread thread;
+    std::mutex mutex;
+    std::atomic<UpdateStatus> status = UpdateStatus::Idle;
+    std::atomic<unsigned long long> downloaded = 0;
+    std::atomic<unsigned long long> total = 0;
+    activetag::update::Release release;
+    std::string error;
+    bool popupRequested = false;
+    bool exitForUpdate = false;
+};
+
 struct AppState {
     activetag::ActiveTag tag;
     activetag::Snapshot snapshot;
@@ -97,6 +120,7 @@ struct AppState {
     int selectedProfile = 0;
     bool darkTheme = true;
     ModalDialog dialog;
+    UpdateState update;
 };
 
 DxState g_dx;
@@ -220,6 +244,119 @@ void showDialog(
 
 void showErrorDialog(const std::exception& error) {
     showDialog(DialogKind::Error, "Error", error.what());
+}
+
+std::filesystem::path executablePath() {
+    std::vector<wchar_t> buffer(32768);
+    const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length == 0 || length >= buffer.size()) {
+        throw std::runtime_error("The application path could not be determined.");
+    }
+    return std::filesystem::path(std::wstring(buffer.data(), length));
+}
+
+activetag::update::Version currentVersion() {
+    return {ACTIVETAG_VERSION_MAJOR, ACTIVETAG_VERSION_MINOR, ACTIVETAG_VERSION_PATCH};
+}
+
+void finishUpdateThread() {
+    if (g_app.update.thread.joinable()) {
+        g_app.update.thread.join();
+    }
+}
+
+void startUpdateCheck() {
+    if (g_app.update.status != UpdateStatus::Idle) {
+        return;
+    }
+    g_app.update.status = UpdateStatus::Checking;
+    g_app.update.thread = std::thread([] {
+        Sleep(3000);
+        try {
+            auto release = activetag::update::fetchLatestRelease();
+            if (activetag::update::compareVersions(release.version, currentVersion()) <= 0) {
+                g_app.update.status = UpdateStatus::Dismissed;
+                return;
+            }
+            {
+                std::scoped_lock lock(g_app.update.mutex);
+                g_app.update.release = std::move(release);
+                g_app.update.popupRequested = true;
+            }
+            g_app.update.status = UpdateStatus::Available;
+        } catch (const std::exception& error) {
+            std::scoped_lock lock(g_app.update.mutex);
+            g_app.update.error = error.what();
+            g_app.update.status = UpdateStatus::Failed;
+        }
+    });
+}
+
+void startUpdateDownload() {
+    finishUpdateThread();
+    g_app.update.status = UpdateStatus::Downloading;
+    g_app.update.downloaded = 0;
+    g_app.update.total = 0;
+    g_app.update.thread = std::thread([] {
+        std::filesystem::path downloadPath;
+        std::filesystem::path checksumPath;
+        try {
+            activetag::update::Release release;
+            {
+                std::scoped_lock lock(g_app.update.mutex);
+                release = g_app.update.release;
+            }
+            const auto current = executablePath();
+            const auto directory = current.parent_path();
+            downloadPath = directory / (release.executableName + L".download");
+            checksumPath = directory / (release.executableName + L".sha256.download");
+
+            std::atomic<unsigned long long> checksumDownloaded = 0;
+            std::atomic<unsigned long long> checksumTotal = 0;
+            activetag::update::downloadFile(
+                release.checksumUrl, checksumPath, checksumDownloaded, checksumTotal);
+            std::ifstream checksumInput(checksumPath, std::ios::binary);
+            std::ostringstream checksumText;
+            checksumText << checksumInput.rdbuf();
+            std::string expectedDigest;
+            if (!activetag::update::parseSha256File(
+                    checksumText.str(), release.executableName, expectedDigest)) {
+                throw std::runtime_error("The release checksum file is invalid.");
+            }
+
+            activetag::update::downloadFile(
+                release.executableUrl, downloadPath,
+                g_app.update.downloaded, g_app.update.total);
+            const std::string actualDigest = activetag::update::sha256File(downloadPath);
+            if (actualDigest != expectedDigest) {
+                throw std::runtime_error(
+                    "The downloaded update failed SHA-256 verification. No files were changed.");
+            }
+
+            g_app.update.status = UpdateStatus::Installing;
+            std::string startError;
+            const auto target = directory / release.executableName;
+            if (!activetag::update::startUpdater(
+                    downloadPath, target, current, expectedDigest,
+                    GetCurrentProcessId(), startError)) {
+                throw std::runtime_error(startError);
+            }
+            {
+                std::scoped_lock lock(g_app.update.mutex);
+                g_app.update.exitForUpdate = true;
+            }
+        } catch (const std::exception& error) {
+            std::error_code ignored;
+            if (!downloadPath.empty()) std::filesystem::remove(downloadPath, ignored);
+            if (!checksumPath.empty()) std::filesystem::remove(checksumPath, ignored);
+            std::scoped_lock lock(g_app.update.mutex);
+            g_app.update.error = error.what();
+            g_app.update.popupRequested = true;
+            g_app.update.status = UpdateStatus::Failed;
+        }
+        std::error_code ignored;
+        if (!checksumPath.empty()) std::filesystem::remove(checksumPath, ignored);
+    });
 }
 
 void clearVisibleLog() {
@@ -1079,6 +1216,96 @@ void drawModalDialog() {
     ImGui::PopStyleVar(2);
 }
 
+void drawUpdateDialog() {
+    UpdateStatus status = g_app.update.status.load();
+    bool requestOpen = false;
+    activetag::update::Release release;
+    std::string error;
+    {
+        std::scoped_lock lock(g_app.update.mutex);
+        requestOpen = g_app.update.popupRequested;
+        g_app.update.popupRequested = false;
+        release = g_app.update.release;
+        error = g_app.update.error;
+    }
+    if (requestOpen) {
+        ImGui::OpenPopup("ActiveTAG Update");
+    }
+    if (status != UpdateStatus::Available && status != UpdateStatus::Downloading &&
+        status != UpdateStatus::Installing && !(status == UpdateStatus::Failed && requestOpen) &&
+        !ImGui::IsPopupOpen("ActiveTAG Update")) {
+        return;
+    }
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(520.0f, 0.0f), ImGuiCond_Appearing);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 18));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14, 8));
+    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, ImVec4(0, 0, 0, 0.68f));
+    if (ImGui::BeginPopupModal("ActiveTAG Update", nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        status = g_app.update.status.load();
+        if (status == UpdateStatus::Available) {
+            ImGui::Text("A new ActiveTAG Configurator version is available.");
+            ImGui::Spacing();
+            ImGui::Text("Current version: %s", ACTIVETAG_VERSION_A);
+            ImGui::Text("New version:     %s", release.tag.c_str());
+            if (!release.notes.empty()) {
+                ImGui::Spacing();
+                ImGui::SeparatorText("Release notes");
+                ImGui::BeginChild("UpdateNotes", ImVec2(470, 110), true);
+                ImGui::PushTextWrapPos(450.0f);
+                ImGui::TextUnformatted(release.notes.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::EndChild();
+            }
+            ImGui::Spacing();
+            if (ImGui::Button("Update", ImVec2(150, 36))) {
+                startUpdateDownload();
+            }
+            ImGui::SameLine(ImGui::GetWindowWidth() - 170);
+            if (ImGui::Button("Cancel", ImVec2(150, 36))) {
+                g_app.update.status = UpdateStatus::Dismissed;
+                ImGui::CloseCurrentPopup();
+            }
+        } else if (status == UpdateStatus::Downloading) {
+            ImGui::TextUnformatted("Downloading and verifying the update...");
+            ImGui::Spacing();
+            const auto downloaded = g_app.update.downloaded.load();
+            const auto total = g_app.update.total.load();
+            const float progress = total > 0
+                ? std::clamp(static_cast<float>(downloaded) / static_cast<float>(total), 0.0f, 1.0f)
+                : 0.0f;
+            const std::string overlay = total > 0
+                ? std::to_string(static_cast<int>(progress * 100.0f)) + "%"
+                : "Connecting...";
+            ImGui::ProgressBar(progress, ImVec2(470, 24), overlay.c_str());
+            ImGui::TextDisabled("The current version remains unchanged until verification succeeds.");
+        } else if (status == UpdateStatus::Installing) {
+            ImGui::TextUnformatted("Update verified. Restarting ActiveTAG Configurator...");
+            ImGui::Spacing();
+            ImGui::ProgressBar(1.0f, ImVec2(470, 24), "Verified");
+        } else if (status == UpdateStatus::Failed) {
+            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "x");
+            ImGui::SameLine();
+            ImGui::PushTextWrapPos(475.0f);
+            ImGui::TextUnformatted(error.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::Spacing();
+            ImGui::TextDisabled("Your current application was not changed.");
+            ImGui::Spacing();
+            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - 140.0f) * 0.5f);
+            if (ImGui::Button("OK", ImVec2(140, 34))) {
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+}
+
 void drawDeviceHeader() {
     if (!g_app.connected) {
         ImGui::TextColored(
@@ -1331,11 +1558,23 @@ void drawMainUi() {
     ImGui::EndChild();
     ImGui::End();
     drawModalDialog();
+    drawUpdateDialog();
 }
 
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
+    int argumentCount = 0;
+    wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+    if (arguments != nullptr && argumentCount > 1 &&
+        std::wstring(arguments[1]) == L"--apply-update") {
+        const int result = activetag::update::runUpdaterMode(argumentCount, arguments);
+        LocalFree(arguments);
+        return result;
+    }
+    if (arguments != nullptr) {
+        LocalFree(arguments);
+    }
     if (!openLogFile()) {
         MessageBoxW(nullptr, L"ActiveTAG-Configurator.log could not be opened.", kAppTitle,
             MB_OK | MB_ICONERROR);
@@ -1385,6 +1624,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     appendLog(L"Log file: " + g_app.logPath.wstring());
     refreshPorts();
     startAutoProbe();
+    startUpdateCheck();
 
     bool done = false;
     while (!done) {
@@ -1398,6 +1638,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         }
         if (done) {
             break;
+        }
+
+        {
+            std::scoped_lock lock(g_app.update.mutex);
+            if (g_app.update.exitForUpdate) {
+                done = true;
+                continue;
+            }
         }
 
         if (g_app.connected && !g_app.busy) {
@@ -1448,6 +1696,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     if (g_app.probeThread.joinable()) {
         g_app.probeThread.join();
     }
+    finishUpdateThread();
     appendLog(L"ActiveTAG Configurator stopped.");
     if (g_app.logFile.is_open()) {
         g_app.logFile.flush();

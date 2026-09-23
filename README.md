@@ -53,6 +53,7 @@ computer.
 | Portable delivery | Produces a statically linked single EXE and a portable ZIP |
 | Persistent diagnostics | Appends timestamped serial communication logs next to the EXE |
 | Native identity | Embeds a multi-resolution Windows icon and version metadata |
+| Automatic updates | Checks public GitHub releases and installs SHA-256-verified portable updates |
 
 ## Supported Fields
 
@@ -167,9 +168,13 @@ The ZIP contains:
 - Official DISM/SFC repair helper
 - Portable usage instructions
 
+Packaging also creates `dist\ActiveTAG-Configurator-vX.Y.Z.exe.sha256`.
+Publish both the versioned EXE and this checksum file as GitHub Release assets;
+the in-app updater rejects releases that do not contain both files.
+
 The executable depends only on protected Windows system components:
 `KERNEL32`, `USER32`, `COMDLG32`, `ADVAPI32`, `D3D11`,
-`D3DCOMPILER_47`, `IMM32`, and `SHELL32`.
+`D3DCOMPILER_47`, `IMM32`, `SHELL32`, `WINHTTP`, and `BCRYPT`.
 These DLLs must not be copied between computers or registered with `regsvr32`.
 
 ## Project Layout

@@ -1,4 +1,5 @@
 #include "../src/active_tag.hpp"
+#include "../src/auto_update.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -58,6 +59,39 @@ std::string lensProfileDump(int profileIndex, const std::array<long long, 8>& le
 }
 
 int main() {
+    activetag::update::Version parsedVersion;
+    if (!activetag::update::parseVersion("v0.8.0", parsedVersion) ||
+        parsedVersion.major != 0 || parsedVersion.minor != 8 || parsedVersion.patch != 0) {
+        std::cerr << "Updater could not parse a valid release version.\n";
+        return 1;
+    }
+    if (activetag::update::parseVersion("v0.8", parsedVersion) ||
+        activetag::update::parseVersion("0.8.0-beta", parsedVersion)) {
+        std::cerr << "Updater accepted an invalid release version.\n";
+        return 1;
+    }
+    if (activetag::update::compareVersions({0, 8, 0}, {0, 7, 7}) <= 0 ||
+        activetag::update::compareVersions({0, 7, 7}, {0, 7, 7}) != 0 ||
+        activetag::update::compareVersions({0, 7, 6}, {0, 7, 7}) >= 0) {
+        std::cerr << "Updater semantic version comparison failed.\n";
+        return 1;
+    }
+    const std::string checksum(64, 'a');
+    std::string parsedChecksum;
+    if (!activetag::update::parseSha256File(
+            checksum + "  ActiveTAG-Configurator-v0.8.0.exe\n",
+            L"ActiveTAG-Configurator-v0.8.0.exe", parsedChecksum) ||
+        parsedChecksum != checksum) {
+        std::cerr << "Updater could not parse the release checksum.\n";
+        return 1;
+    }
+    if (activetag::update::parseSha256File(
+            checksum + "  another-file.exe\n",
+            L"ActiveTAG-Configurator-v0.8.0.exe", parsedChecksum)) {
+        std::cerr << "Updater accepted a checksum for another file.\n";
+        return 1;
+    }
+
     if (activetag::ActiveTag::formatSerialValueForWrite(0xFFFFFFFFLL) != "-1") {
         std::cerr << "Disabled LED write value must be sent as -1 for firmware to store 0xFFFFFFFF.\n";
         return 1;

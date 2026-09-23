@@ -21,6 +21,8 @@ execute_process(
 
 add_executable(ActiveTAGConfigurator WIN32
     src/main_imgui.cpp
+    src/auto_update.cpp
+    src/auto_update.hpp
     src/active_tag.cpp
     src/active_tag.hpp
     src/serial_port.cpp
@@ -44,7 +46,7 @@ target_include_directories(ActiveTAGConfigurator PRIVATE
     third_party/imgui
     third_party/imgui/backends)
 target_link_libraries(ActiveTAGConfigurator PRIVATE
-    user32 gdi32 comdlg32 advapi32 d3d11 dxgi imm32)
+    user32 gdi32 comdlg32 advapi32 d3d11 dxgi imm32 winhttp bcrypt shell32)
 
 if(MSVC)
     set_property(TARGET ActiveTAGConfigurator PROPERTY
