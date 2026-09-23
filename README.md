@@ -129,7 +129,7 @@ build.cmd
 Output:
 
 ```text
-build\ActiveTAG-Configurator-vX.Y.Z.exe
+build\ActiveTAG-Configurator.exe
 ```
 
 The build uses the static MSVC runtime (`/MT`), so the target machine does not
@@ -138,7 +138,8 @@ need the Visual C++ Redistributable.
 Dear ImGui `v1.92.8` is vendored in `third_party/imgui` and compiled into the
 EXE. The application icon and Windows version metadata are embedded directly
 into the EXE. `version.json` controls the window title, file metadata, EXE
-name, and portable ZIP naming.
+metadata and portable ZIP naming. The executable itself keeps the stable
+`ActiveTAG-Configurator.exe` name across releases.
 
 ## Test
 
@@ -163,14 +164,15 @@ dist\ActiveTAG-Configurator-vX.Y.Z-Portable-x64.zip
 
 The ZIP contains:
 
-- Versioned `ActiveTAG-Configurator-vX.Y.Z.exe`
+- Stable `ActiveTAG-Configurator.exe`
 - Windows dependency check
 - Official DISM/SFC repair helper
 - Portable usage instructions
 
-Packaging also creates `dist\ActiveTAG-Configurator-vX.Y.Z.exe.sha256`.
-Publish both the versioned EXE and this checksum file as GitHub Release assets;
-the in-app updater rejects releases that do not contain both files.
+Packaging also creates `dist\ActiveTAG-Configurator.exe.sha256`. For compatibility
+with v0.8.0 and v0.8.1, it additionally creates versioned EXE/checksum aliases.
+Publish the stable EXE and checksum as GitHub Release assets; the in-app updater
+rejects releases that do not contain a matching pair.
 
 The executable depends only on protected Windows system components:
 `KERNEL32`, `USER32`, `COMDLG32`, `ADVAPI32`, `D3D11`,

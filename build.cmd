@@ -19,10 +19,6 @@ if errorlevel 1 exit /b 1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Prepare-Build.ps1"
 if errorlevel 1 exit /b 1
 
-for /f "usebackq tokens=*" %%i in (`powershell.exe -NoProfile -Command "$v=Get-Content -Raw '%~dp0version.json'|ConvertFrom-Json; 'v{0}.{1}.{2}' -f $v.major,$v.minor,$v.patch"`) do (
-  set "APP_VERSION=%%i"
-)
-
 if not exist build mkdir build
 pushd build
 
@@ -42,7 +38,7 @@ cl /nologo /std:c++20 /O2 /W4 /EHsc /permissive- /DUNICODE /D_UNICODE /DNOMINMAX
   "..\third_party\imgui\backends\imgui_impl_win32.cpp" ^
   "..\third_party\imgui\backends\imgui_impl_dx11.cpp" ^
   "ActiveTAG-Configurator.res" ^
-  /link /SUBSYSTEM:WINDOWS /OUT:"ActiveTAG-Configurator-%APP_VERSION%.exe" ^
+  /link /SUBSYSTEM:WINDOWS /OUT:"ActiveTAG-Configurator.exe" ^
   user32.lib gdi32.lib comdlg32.lib advapi32.lib d3d11.lib dxgi.lib imm32.lib ^
   winhttp.lib bcrypt.lib shell32.lib
 

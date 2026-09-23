@@ -26,7 +26,8 @@ $header = @"
 #define ACTIVETAG_VERSION_A "$displayVersion"
 #define ACTIVETAG_APP_TITLE_W L"ActiveTAG Configurator $displayVersion"
 #define ACTIVETAG_WINDOW_TITLE_W L"Zero Density ActiveTAG Configurator $displayVersion"
-#define ACTIVETAG_EXE_NAME_W L"ActiveTAG-Configurator-$displayVersion.exe"
+#define ACTIVETAG_EXE_NAME_W L"ActiveTAG-Configurator.exe"
+#define ACTIVETAG_LEGACY_EXE_NAME_W L"ActiveTAG-Configurator-$displayVersion.exe"
 "@
 Set-Content -LiteralPath (Join-Path $generated "version.hpp") -Value $header -Encoding ascii
 
@@ -67,7 +68,7 @@ BEGIN
             VALUE "FileDescription", "Native OptiTrack Active Tag Configurator\0"
             VALUE "FileVersion", "$fileVersion\0"
             VALUE "InternalName", "ActiveTAG-Configurator\0"
-            VALUE "OriginalFilename", "ActiveTAG-Configurator-$displayVersion.exe\0"
+            VALUE "OriginalFilename", "ActiveTAG-Configurator.exe\0"
             VALUE "ProductName", "ActiveTAG Configurator\0"
             VALUE "ProductVersion", "$displayVersion\0"
         END

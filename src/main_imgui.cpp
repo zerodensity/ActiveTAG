@@ -359,6 +359,37 @@ void startUpdateDownload() {
     });
 }
 
+bool migrateToCanonicalExecutableName() {
+    try {
+        const auto current = executablePath();
+        if (_wcsicmp(current.filename().c_str(), ACTIVETAG_EXE_NAME_W) == 0) {
+            return false;
+        }
+
+        const auto target = current.parent_path() / ACTIVETAG_EXE_NAME_W;
+        auto migrationSource = target;
+        migrationSource += L".migration.download";
+        std::filesystem::copy_file(
+            current, migrationSource, std::filesystem::copy_options::overwrite_existing);
+        const std::string digest = activetag::update::sha256File(migrationSource);
+        std::string startError;
+        if (!activetag::update::startUpdater(
+                migrationSource, target, current, digest,
+                GetCurrentProcessId(), startError)) {
+            std::error_code ignored;
+            std::filesystem::remove(migrationSource, ignored);
+            MessageBoxA(nullptr, startError.c_str(), "ActiveTAG Name Migration Failed",
+                MB_OK | MB_ICONERROR);
+            return false;
+        }
+        return true;
+    } catch (const std::exception& error) {
+        MessageBoxA(nullptr, error.what(), "ActiveTAG Name Migration Failed",
+            MB_OK | MB_ICONERROR);
+        return false;
+    }
+}
+
 void clearVisibleLog() {
     {
         std::scoped_lock lock(g_app.mutex);
@@ -1574,6 +1605,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     }
     if (arguments != nullptr) {
         LocalFree(arguments);
+    }
+    if (migrateToCanonicalExecutableName()) {
+        return 0;
     }
     if (!openLogFile()) {
         MessageBoxW(nullptr, L"ActiveTAG-Configurator.log could not be opened.", kAppTitle,

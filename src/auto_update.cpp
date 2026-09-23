@@ -274,16 +274,35 @@ Release fetchLatestRelease() {
     if (!parseVersion(release.tag, release.version)) {
         throw std::runtime_error("The latest GitHub release has an invalid version tag.");
     }
-    const std::string expectedPrefix = "ActiveTAG-Configurator-" + release.tag;
+    const std::string canonicalExecutable = "ActiveTAG-Configurator.exe";
+    const std::string canonicalChecksum = canonicalExecutable + ".sha256";
+    const std::string legacyExecutable = "ActiveTAG-Configurator-" + release.tag + ".exe";
+    const std::string legacyChecksum = legacyExecutable + ".sha256";
+    std::string canonicalExecutableUrl;
+    std::string canonicalChecksumUrl;
+    std::string legacyExecutableUrl;
+    std::string legacyChecksumUrl;
     for (const auto& asset : document.at("assets")) {
         const std::string name = asset.at("name").get<std::string>();
         const std::string url = asset.at("browser_download_url").get<std::string>();
-        if (name == expectedPrefix + ".exe") {
-            release.executableName = utf8ToWide(name);
-            release.executableUrl = url;
-        } else if (name == expectedPrefix + ".exe.sha256") {
-            release.checksumUrl = url;
+        if (name == canonicalExecutable) {
+            canonicalExecutableUrl = url;
+        } else if (name == canonicalChecksum) {
+            canonicalChecksumUrl = url;
+        } else if (name == legacyExecutable) {
+            legacyExecutableUrl = url;
+        } else if (name == legacyChecksum) {
+            legacyChecksumUrl = url;
         }
+    }
+    if (!canonicalExecutableUrl.empty() && !canonicalChecksumUrl.empty()) {
+        release.executableName = utf8ToWide(canonicalExecutable);
+        release.executableUrl = canonicalExecutableUrl;
+        release.checksumUrl = canonicalChecksumUrl;
+    } else if (!legacyExecutableUrl.empty() && !legacyChecksumUrl.empty()) {
+        release.executableName = utf8ToWide(legacyExecutable);
+        release.executableUrl = legacyExecutableUrl;
+        release.checksumUrl = legacyChecksumUrl;
     }
     if (release.executableUrl.empty() || release.checksumUrl.empty()) {
         throw std::runtime_error(

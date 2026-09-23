@@ -37,7 +37,7 @@ add_executable(ActiveTAGConfigurator WIN32
 )
 
 set_target_properties(ActiveTAGConfigurator PROPERTIES
-    OUTPUT_NAME "ActiveTAG-Configurator-${ACTIVETAG_DISPLAY_VERSION}")
+    OUTPUT_NAME "ActiveTAG-Configurator")
 
 target_compile_features(ActiveTAGConfigurator PRIVATE cxx_std_20)
 target_compile_definitions(ActiveTAGConfigurator PRIVATE UNICODE _UNICODE NOMINMAX)
