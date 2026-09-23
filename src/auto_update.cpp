@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <bcrypt.h>
+#include <tlhelp32.h>
 #include <winhttp.h>
 
 #include <nlohmann/json.hpp>
@@ -201,6 +202,39 @@ std::wstring argumentValue(int count, wchar_t** arguments, const std::wstring& n
         }
     }
     return {};
+}
+
+bool isProcessRunningFromPath(const std::filesystem::path& expectedPath) {
+    const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    PROCESSENTRY32W entry{};
+    entry.dwSize = sizeof(entry);
+    bool found = false;
+    if (Process32FirstW(snapshot, &entry)) {
+        do {
+            if (entry.th32ProcessID == GetCurrentProcessId()) {
+                continue;
+            }
+            const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
+                entry.th32ProcessID);
+            if (process == nullptr) {
+                continue;
+            }
+            std::vector<wchar_t> pathBuffer(32768);
+            DWORD pathLength = static_cast<DWORD>(pathBuffer.size());
+            if (QueryFullProcessImageNameW(
+                    process, 0, pathBuffer.data(), &pathLength) &&
+                _wcsicmp(std::wstring(pathBuffer.data(), pathLength).c_str(),
+                    expectedPath.c_str()) == 0) {
+                found = true;
+            }
+            CloseHandle(process);
+        } while (!found && Process32NextW(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    return found;
 }
 
 }  // namespace
@@ -468,13 +502,23 @@ int runUpdaterMode(int argumentCount, wchar_t** arguments) {
         std::error_code ignored;
         std::filesystem::remove(backup, ignored);
         const bool hadTarget = std::filesystem::exists(target);
-        if (hadTarget && !MoveFileExW(target.c_str(), backup.c_str(), MOVEFILE_WRITE_THROUGH)) {
+        bool targetAlreadyCurrent = false;
+        if (hadTarget) {
+            try {
+                targetAlreadyCurrent = sha256File(target) == expectedSha256;
+            } catch (...) {
+                targetAlreadyCurrent = false;
+            }
+        }
+        if (hadTarget && !targetAlreadyCurrent &&
+            !MoveFileExW(target.c_str(), backup.c_str(), MOVEFILE_WRITE_THROUGH)) {
             MessageBoxW(nullptr, L"The existing application could not be backed up.",
                 L"ActiveTAG Update Failed", MB_OK | MB_ICONERROR);
             return 4;
         }
-        if (!MoveFileExW(source.c_str(), target.c_str(),
-                MOVEFILE_WRITE_THROUGH)) {
+        if (targetAlreadyCurrent) {
+            DeleteFileW(source.c_str());
+        } else if (!MoveFileExW(source.c_str(), target.c_str(), MOVEFILE_WRITE_THROUGH)) {
             if (hadTarget) {
                 MoveFileExW(backup.c_str(), target.c_str(), MOVEFILE_WRITE_THROUGH);
             }
@@ -482,25 +526,30 @@ int runUpdaterMode(int argumentCount, wchar_t** arguments) {
                 L"ActiveTAG Update Failed", MB_OK | MB_ICONERROR);
             return 5;
         }
-        std::wstring command = quoteArgument(target.wstring());
-        std::vector<wchar_t> mutableCommand(command.begin(), command.end());
-        mutableCommand.push_back(L'\0');
-        STARTUPINFOW startup{};
-        startup.cb = sizeof(startup);
-        PROCESS_INFORMATION process{};
-        if (!CreateProcessW(target.c_str(), mutableCommand.data(), nullptr, nullptr, FALSE, 0,
-                nullptr, target.parent_path().c_str(), &startup, &process)) {
-            DeleteFileW(target.c_str());
-            if (hadTarget) {
-                MoveFileExW(backup.c_str(), target.c_str(), MOVEFILE_WRITE_THROUGH);
+        if (!(targetAlreadyCurrent && isProcessRunningFromPath(target))) {
+            std::wstring command = quoteArgument(target.wstring());
+            std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+            mutableCommand.push_back(L'\0');
+            STARTUPINFOW startup{};
+            startup.cb = sizeof(startup);
+            PROCESS_INFORMATION process{};
+            if (!CreateProcessW(target.c_str(), mutableCommand.data(), nullptr, nullptr, FALSE, 0,
+                    nullptr, target.parent_path().c_str(), &startup, &process)) {
+                if (!targetAlreadyCurrent) {
+                    DeleteFileW(target.c_str());
+                }
+                if (hadTarget && !targetAlreadyCurrent) {
+                    MoveFileExW(backup.c_str(), target.c_str(), MOVEFILE_WRITE_THROUGH);
+                }
+                MessageBoxW(nullptr,
+                    L"The update was installed, but the new version could not start.",
+                    L"ActiveTAG Update", MB_OK | MB_ICONWARNING);
+                return 6;
             }
-            MessageBoxW(nullptr, L"The update was installed, but the new version could not start.",
-                L"ActiveTAG Update", MB_OK | MB_ICONWARNING);
-            return 6;
+            CloseHandle(process.hThread);
+            CloseHandle(process.hProcess);
         }
-        CloseHandle(process.hThread);
-        CloseHandle(process.hProcess);
-        if (hadTarget) {
+        if (hadTarget && !targetAlreadyCurrent) {
             DeleteFileW(backup.c_str());
         }
         if (!old.empty() && old != target) {
